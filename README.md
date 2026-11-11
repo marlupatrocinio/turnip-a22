@@ -139,8 +139,13 @@ Runtime knobs for per-title experiments:
 
 DXVK/VKD3D-Proton already get `tu_autotune_algorithm="prefer_sysmem"` from
 upstream's baked-in driconf, which is the right default for a small-GMEM part.
-For native Android emulators, `TU_AUTOTUNE_ALGO=prefer_gmem` is the first thing
-to try if a title is resolve-bandwidth bound — measure before keeping it.
+
+> **Known issue:** forcing tiled rendering (`TU_DEBUG=gmem`, or
+> `TU_AUTOTUNE_ALGO=prefer_gmem`) corrupts rendering on this GPU — black player
+> models, broken lighting. The default autotuner is correct **and** faster, so
+> leave it alone. If a title shows corruption, force the opposite way with
+> `TU_DEBUG=sysmem`. Details, evidence and an opt-in build patch:
+> [docs/BUG-GMEM.md](docs/BUG-GMEM.md).
 
 ## Repository layout
 
