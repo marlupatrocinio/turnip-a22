@@ -1,0 +1,14 @@
+--- a/src/freedreno/vulkan/tu_cmd_buffer.cc
++++ b/src/freedreno/vulkan/tu_cmd_buffer.cc
+@@ -1422,6 +1422,11 @@
+ {
+    if (TU_DEBUG(SYSMEM)) {
+       cmd->state.rp.force_render_mode_reason = "TU_DEBUG(SYSMEM)";
++      return true;
++   }
++
++   if (cmd->device->physical_device->dev_id.chip_id == 0x43030b00) {
++      cmd->state.rp.force_render_mode_reason = "Adreno A22 GMEM erratum";
+       return true;
+    }
+ 

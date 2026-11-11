@@ -18,10 +18,12 @@ turnip-a22/
 |   |-- VALIDATION.md
 |   |-- BENCHMARKS.md
 |   |-- EMULATION_TUNING.md
+|   |-- BUG-GMEM.md
 |   |-- RELEASING.md
 |   |-- REPO_STRUCTURE.md
 |   `-- artifacts/stock-vkjson.json
 |-- patches/
+|   -- optional/0003-force-sysmem-on-adreno-a22.patch
 |   |-- 0001-freedreno-add-A22-device-id.patch
 |   `-- 0002-meson-allow-posix-flex-when-cross-compiling-for-android.patch
 |-- scripts/
