@@ -21,7 +21,7 @@
 #include <dlfcn.h>
 
 #include "msm_kgsl.h"
-#include <hardware/hwvulkan.h>
+#include "android_hwvulkan.h"
 
 static void kgsl_probe(void)
 {
@@ -199,4 +199,5 @@ int main(int argc, char **argv)
     printf("RESULT: driver loaded and enumerated OK\n");
     return 0;
 }
+
 

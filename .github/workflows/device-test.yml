@@ -1,0 +1,55 @@
+name: device-test
+
+# Hardware gate for a published package. Runs on a self-hosted runner with the
+# A22 device attached over adb. Fails the run unless the driver loads and both
+# functional tests pass, so a release can be re-verified (or a candidate
+# rejected) without hand-running adb commands.
+#
+# Runner setup (once):
+#   1. Register a self-hosted runner on the PC that has the device attached.
+#   2. Give it the labels  android-a22  (and self-hosted/windows).
+#   3. Ensure `adb`, `gh`, `unzip` and Git Bash are on the runner's PATH.
+#   4. Optional repo variable ANDROID_SERIAL if more than one device is attached.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag whose packages should be tested'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  device:
+    runs-on: [self-hosted, android-a22]
+    timeout-minutes: 30
+    env:
+      ANDROID_SERIAL: ${{ vars.ANDROID_SERIAL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build probe binaries
+        shell: bash
+        run: bash scripts/build_probes.sh
+
+      - name: Download release packages
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p artifacts
+          gh release download "${{ inputs.tag }}" -p '*.adpkg.zip' -D artifacts --clobber
+          ls -lh artifacts
+
+      - name: Run functional gate
+        shell: bash
+        run: |
+          set -e
+          for zip in artifacts/*.adpkg.zip; do
+            echo "::group::$(basename "$zip")"
+            bash scripts/device_test.sh "$zip" build/probe-tools/a22test
+            echo "::endgroup::"
+          done

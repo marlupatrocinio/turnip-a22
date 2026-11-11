@@ -44,5 +44,5 @@ jobs:
           name: turnip-a22-adpkg
           path: |
             dist/*.zip
-            dist/SHA256SUMS-*.txt
+            dist/SHA256SUMS.txt
           retention-days: 30

@@ -4,41 +4,43 @@
 
 ```
 turnip-a22/
-├── .github/
-│   ├── ISSUE_TEMPLATE/
-│   │   └── bug_report.yml          # required device/logcat fields
-│   └── workflows/
-│       ├── build.yml               # build both variants on push/PR
-│       └── release.yml             # manual publish from an existing tag
-├── docs/
-│   ├── HARDWARE_TELEMETRY.md       # every value read from the device
-│   ├── DRIVER_DESIGN.md            # findings, decisions, rejected options
-│   ├── BUILD.md                    # toolchain, cross files, host notes
-│   ├── BUILD_INFO.md               # provenance of the shipped 26.3.0 build
-│   ├── VALIDATION.md               # on-device test evidence
-│   ├── REPO_STRUCTURE.md           # this file
-│   └── artifacts/
-│       └── stock-vkjson.json       # stock driver dump used as reference
-├── patches/
-│   ├── 0001-freedreno-add-A22-device-id.patch
-│   └── 0002-meson-allow-posix-flex-when-cross-compiling-for-android.patch
-├── scripts/
-│   ├── build_turnip_g2gen2.sh      # reproducible Linux/CI build
-│   └── package_driver.py           # strip + meta.json + zip
-├── tools/
-│   ├── probe/
-│   │   ├── a22probe.c              # KGSL ioctls + HAL enumeration
-│   │   ├── a22test.c               # compute + clear/resolve verification
-│   │   ├── a22_compute.comp        # test shader
-│   │   └── msm_kgsl.h              # KGSL uapi header (Mesa copy)
-│   └── win/
-│       └── mininja.py              # Windows-host fallback build driver
-├── versions.env                    # pinned Mesa / NDK / glslang versions
-├── LICENSE
-├── NOTICE
-├── README.md
-├── .gitattributes
-└── .gitignore
+|-- .github/
+|   |-- ISSUE_TEMPLATE/bug_report.yml
+|   `-- workflows/
+|       |-- build.yml            # build both variants on push/PR
+|       |-- device-test.yml      # hardware gate on a self-hosted runner
+|       `-- release.yml          # manual publish from an existing tag
+|-- docs/
+|   |-- HARDWARE_TELEMETRY.md
+|   |-- DRIVER_DESIGN.md
+|   |-- BUILD.md
+|   |-- BUILD_INFO.md
+|   |-- VALIDATION.md
+|   |-- RELEASING.md
+|   |-- REPO_STRUCTURE.md
+|   `-- artifacts/stock-vkjson.json
+|-- patches/
+|   |-- 0001-freedreno-add-A22-device-id.patch
+|   `-- 0002-meson-allow-posix-flex-when-cross-compiling-for-android.patch
+|-- scripts/
+|   |-- build_turnip_g2gen2.sh   # reproducible Linux/CI build
+|   |-- package_driver.py        # strip + debug symbols + deterministic zip
+|   |-- build_probes.sh          # build the on-device test binaries
+|   `-- device_test.sh           # hardware release gate (adb)
+|-- tools/
+|   |-- probe/
+|   |   |-- a22probe.c           # KGSL ioctls + HAL enumeration
+|   |   |-- a22test.c            # compute + clear/resolve verification
+|   |   |-- a22_compute.comp     # test shader
+|   |   |-- android_hwvulkan.h   # self-contained HAL ABI (NDK-only builds)
+|   |   `-- msm_kgsl.h           # KGSL uapi header (Mesa copy)
+|   `-- win/mininja.py           # Windows-host fallback build driver
+|-- versions.env
+|-- LICENSE
+|-- NOTICE
+|-- README.md
+|-- .gitattributes
+`-- .gitignore
 ```
 
 ## What belongs in git — and what does not
@@ -124,6 +126,7 @@ gh workflow run release.yml -f tag=v26.3.0-a22.1
 Before tagging, confirm:
 
 - [ ] `./scripts/build_turnip_g2gen2.sh` succeeds from a clean checkout
+- [ ] device gate passes for both variants (`scripts/device_test.sh`)
 - [ ] both zips install and boot in at least one front-end
 - [ ] `sha256sum dist/*.zip` matches the attached `SHA256SUMS.txt`
 - [ ] README "Validation" section reflects the current run
@@ -138,5 +141,8 @@ Before tagging, confirm:
   "validated" claim; without them the README is marketing.
 * **Binaries out of git.** A 14 MB `.so` re-packed every release would dominate
   repository size; Releases keep history small and give checksums for free.
+* **Reproducible packages.** Fixed zip timestamps and sorted entries mean the
+  same inputs give the same SHA256, so a published checksum identifies the exact
+  bytes users download.
 * **Pinned inputs.** `versions.env` + `MESA_SHA256` make builds reproducible and
   let CI cache correctly.

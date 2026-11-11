@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Build Turnip (Mesa Vulkan) for the Snapdragon G2 Gen 2 / Adreno A22.
 #
 # Produces two AdrenoTools packages in dist/:
@@ -135,7 +135,8 @@ build_variant() { # $1=A|B $2=extra cflags string (ninja format)
     [ -f "$so" ] || die "build produced no $so"
     log "packaging variant $v"
     python3 "$HERE/scripts/package_driver.py" --so "$so" --variant "$v" \
-        --version "$MESA_VERSION" --strip-tool "$TOOLCHAIN/llvm-strip" --out "$DIST"
+        --version "$MESA_VERSION" --strip-tool "$TOOLCHAIN/llvm-strip" \
+        --objcopy-tool "$TOOLCHAIN/llvm-objcopy" --out "$DIST"
 }
 
 A_EXTRA=""
@@ -148,5 +149,8 @@ case "$VARIANT" in
     *) die "unknown VARIANT=$VARIANT (A|B|all)" ;;
 esac
 
+( cd "$DIST" && sha256sum *.zip > SHA256SUMS.txt )
+
 log "done - packages in $DIST"
 ls -lh "$DIST"/*.zip
+

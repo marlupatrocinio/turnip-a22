@@ -1,15 +1,15 @@
 name: release
 
 # Manual publishing. Run from the Actions tab (or `gh workflow run release.yml
-# -f tag=v26.3.0-a22.1`) after the tag exists and the packages have been
-# validated on hardware. Tag pushes do not auto-publish, so a local
-# hardware-validated build can be attached without a CI build racing it.
+# -f tag=v26.3.0-a22.2`) after the tag exists and the packages have been
+# validated on hardware with the device-test workflow. Tag pushes do not
+# auto-publish, so hardware-validated artifacts can be the ones users get.
 
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Existing tag to publish (e.g. v26.3.0-a22.1)'
+        description: 'Existing tag to publish (e.g. v26.3.0-a22.2)'
         required: true
         type: string
 
@@ -20,6 +20,8 @@ jobs:
   release:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    env:
+      MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -51,6 +53,15 @@ jobs:
           sha256sum *.zip > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
+      - name: Sign checksums (optional)
+        if: env.MINISIGN_SECRET_KEY != ''
+        run: |
+          sudo apt-get install -y --no-install-recommends minisign
+          printf '%s' "$MINISIGN_SECRET_KEY" > "$RUNNER_TEMP/minisign.key"
+          minisign -Sm dist/SHA256SUMS.txt -s "$RUNNER_TEMP/minisign.key" \
+            -t "Turnip A22 ${{ inputs.tag }}"
+          rm -f "$RUNNER_TEMP/minisign.key"
+
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -60,8 +71,10 @@ jobs:
             echo "::error::Release $TAG already exists; cut a new tag instead of republishing."
             exit 1
           fi
-          gh release create "$TAG" \
-            dist/*.adpkg.zip \
-            dist/SHA256SUMS.txt \
+          assets=(dist/*.zip dist/SHA256SUMS.txt)
+          if [ -f dist/SHA256SUMS.txt.minisig ]; then
+            assets+=(dist/SHA256SUMS.txt.minisig)
+          fi
+          gh release create "$TAG" "${assets[@]}" \
             --title "Turnip A22 $TAG" \
             --generate-notes

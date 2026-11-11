@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Turnip functional validation for Snapdragon G2 Gen 2 / Adreno A22.
  *
  * Loads the packaged Android Vulkan HAL (HMI), creates a real VkDevice and:
@@ -18,7 +18,7 @@
 #include <time.h>
 #include <dlfcn.h>
 
-#include <hardware/hwvulkan.h>
+#include "android_hwvulkan.h"
 #include <vulkan/vulkan.h>
 
 #include "a22_comp_spv.h"
@@ -435,3 +435,4 @@ int main(int argc, char **argv)
     ((PFN_vkDeviceWaitIdle)G(instance, "vkDeviceWaitIdle"))(device);
     return 0;
 }
+

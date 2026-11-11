@@ -14,6 +14,13 @@ Android NDK / LLVM
   Version: r28c (clang 19.0.1)
   License: Apache-2.0 with LLVM exceptions (build tool only, not redistributed)
 
+AOSP hardware headers (tools/probe/android_hwvulkan.h)
+  Source:  https://android.googlesource.com/platform/hardware/libhardware
+  License: Apache-2.0, Copyright (C) 2008, 2015 The Android Open Source Project
+  Only the HAL struct layouts needed to open a Vulkan HAL are reproduced, so the
+  probe/test tools build against the NDK alone.
+
+
 glslang
   Source:  https://github.com/KhronosGroup/glslang
   Version: 16.6.0

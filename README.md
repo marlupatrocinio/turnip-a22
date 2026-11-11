@@ -60,6 +60,10 @@ Both are Mesa 26.3.0, `-O3` release, assertions and debug logging compiled out,
 `libc++` statically linked, and fully stripped. Download the latest `.adpkg.zip`
 from [Releases](../../releases).
 
+Each release also ships separate `*.debug.zip` symbol archives and a
+deterministic `SHA256SUMS.txt` (same inputs → same hash). How the hardware gate
+and publishing work: [docs/RELEASING.md](docs/RELEASING.md).
+
 ## Install
 
 1. Copy the zip to the device (`adb push turnip-a22-*.adpkg.zip /sdcard/Download/`).
@@ -105,6 +109,17 @@ variants, strips and packages them. CI does the same on every push
 ([`.github/workflows/build.yml`](.github/workflows/build.yml)); publishing is a
 manual step that attaches validated packages to an existing tag
 ([`.github/workflows/release.yml`](.github/workflows/release.yml)).
+
+Before publishing, run the hardware gate:
+
+```bash
+bash scripts/build_probes.sh
+bash scripts/device_test.sh dist/turnip-a22-26.3.0-variantA.adpkg.zip
+```
+
+or trigger the [`device-test`](.github/workflows/device-test.yml) workflow on a
+self-hosted runner with the device attached. Full release process:
+[docs/RELEASING.md](docs/RELEASING.md).
 
 Full toolchain details, cross files and Windows-host notes:
 [docs/BUILD.md](docs/BUILD.md).

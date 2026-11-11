@@ -103,6 +103,22 @@ libvulkan_freedreno.so
 `packageVersion`, `vendor: "Mesa"`, `driverVersion`, `minApi: 28`,
 `libraryName: "libvulkan_freedreno.so"`.
 
+Packaging guarantees:
+
+* **Deterministic archives** — fixed 1980-01-01 timestamps, sorted entries and
+  fixed permissions. Running the packager twice on the same library produces the
+  same SHA256, so published checksums identify the exact bytes.
+* **Debug symbols are separate** — `--objcopy-tool` extracts
+  `libvulkan_freedreno.so.debug` (via `llvm-objcopy --only-keep-debug`) and ships
+  it as `*.debug.zip`. AdrenoTools packages stay `meta.json` + `.so` only.
+  Symbolize tombstone offsets with
+  `llvm-symbolizer --obj=libvulkan_freedreno.so.debug 0x<offset>`.
+* **Unchanged driver binary** — the stripped `.so` is byte-identical to the one
+  validated on hardware; packaging changes (timestamps, meta) do not alter it.
+  `sha256sum dist/stage-*/libvulkan_freedreno.so` proves it.
+
+Release process, hardware gate and signing: [RELEASING.md](RELEASING.md).
+
 ## Windows-host notes
 
 This project was originally built on a Windows 11 workstation without WSL or
