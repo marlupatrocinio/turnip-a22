@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Minimal Android Vulkan HAL ABI, self-contained for the probe/test tools.
  *
  * Derived from AOSP hardware/libhardware/include/hardware/hardware.h and
@@ -55,7 +55,11 @@ typedef struct hw_device_t {
     uint32_t tag;
     uint32_t version;
     struct hw_module_t *module;
+#ifdef __LP64__
+    uint64_t reserved[12];
+#else
     uint32_t reserved[12];
+#endif
     int (*close)(struct hw_device_t *device);
 } hw_device_t;
 
@@ -77,3 +81,4 @@ typedef struct hwvulkan_module_t {
 #endif
 
 #endif /* A22_ANDROID_HWVULKAN_H */
+

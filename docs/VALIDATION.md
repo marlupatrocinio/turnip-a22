@@ -110,7 +110,45 @@ adb shell LD_LIBRARY_PATH=/data/local/tmp /data/local/tmp/a22test \
 The shipped `.so` links only against system libraries, so no extra `.so` needs to
 be pushed.
 
-## 7. Not covered by this validation
+## 7. Release gate — v26.3.0 packages (packageVersion 2)
+
+Executed 2026-11-11 against the exact archives in `dist/` using the logic of
+`scripts/device_test.sh` (device `MC94528AQF092401436`, shell user):
+
+| Package | SHA256 (zip) | Result |
+|---|---|---|
+| `turnip-a22-26.3.0-variantA.adpkg.zip` | `29077825a01dcd7d…` | PASS |
+| `turnip-a22-26.3.0-variantB.adpkg.zip` | `a88cc00f8fb49120…` | PASS |
+
+```
+===== Variant A =====
+GPU: Adreno (TM) 22 (api 1.4.363)
+compute dispatch: PASS (64/64 correct)
+compute round-trip: 0.240 ms/dispatch (200 submits)
+image clear+resolve: PASS (262144/262144 pixels correct)
+RESULT: functional validation finished
+===== Variant B =====
+GPU: Adreno (TM) 22 (api 1.4.363)
+compute dispatch: PASS (64/64 correct)
+compute round-trip: 0.241 ms/dispatch (200 submits)
+image clear+resolve: PASS (262144/262144 pixels correct)
+RESULT: functional validation finished
+```
+
+The gate also caught a bug in the test harness itself, not the driver: the
+vendored AOSP header used for NDK-only builds declared
+`hw_device_t::reserved` as `uint32_t[12]`, while AOSP uses `uint64_t[12]` on
+LP64. That shifted the HAL entry points by 0x30 bytes, so the freshly built
+`a22test` read a NULL `CreateInstance` and crashed with `SIGSEGV` at `pc 0`.
+The driver was unaffected — the older binary built against Mesa's headers passed
+on the same `.so`. Fixed in `tools/probe/android_hwvulkan.h`; both binaries and
+both variants pass afterwards.
+
+Driver binaries are byte-identical to the ones validated in §4 (`61136ad1…` for
+Variant A, `f308afd4…` for Variant B); only `meta.json` (`packageVersion` 1 → 2)
+and the deterministic zip container changed.
+
+## 8. Not covered by this validation
 
 * Real games / emulator titles (no benchmark corpus was installed on the device).
 * Thermal throttling behaviour over long sessions.

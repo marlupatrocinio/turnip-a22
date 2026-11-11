@@ -62,7 +62,9 @@ static void init_vulkan(const char *lib)
         printf("HAL open failed: %d\n", rc);
         exit(1);
     }
-    gipa = ((hwvulkan_device_t *)dev)->GetInstanceProcAddr;
+    hwvulkan_device_t *vdev = (hwvulkan_device_t *)dev;
+    gipa = vdev->GetInstanceProcAddr;
+
 
     VkApplicationInfo app = {
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
@@ -73,7 +75,7 @@ static void init_vulkan(const char *lib)
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
         .pApplicationInfo = &app,
     };
-    CHECK(((PFN_vkCreateInstance)gipa(NULL, "vkCreateInstance"))(&ici, NULL, &instance));
+    CHECK(vdev->CreateInstance(&ici, NULL, &instance));
 
     uint32_t n = 0;
     ((PFN_vkEnumeratePhysicalDevices)G(instance, "vkEnumeratePhysicalDevices"))(instance, &n, NULL);
@@ -427,6 +429,7 @@ static void test_clear_copy(void)
 
 int main(int argc, char **argv)
 {
+    setvbuf(stdout, NULL, _IONBF, 0);
     const char *lib = argc > 1 ? argv[1] : "libvulkan_freedreno.so";
     init_vulkan(lib);
     test_compute();
@@ -435,4 +438,5 @@ int main(int argc, char **argv)
     ((PFN_vkDeviceWaitIdle)G(instance, "vkDeviceWaitIdle"))(device);
     return 0;
 }
+
 
