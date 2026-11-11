@@ -273,8 +273,10 @@ static void bench_render(const char *label, int width, int height, int draws, in
         .layout = layout, .renderPass = rp,
     };
     VkPipeline pipe;
+    double t_pipe = now_ms();
     CHECK(((PFN_vkCreateGraphicsPipelines)G(instance, "vkCreateGraphicsPipelines"))
           (device, NULL, 1, &gpci, NULL, &pipe));
+    printf("BENCH pipeline   create %.3f ms\n", now_ms() - t_pipe);
 
     VkCommandPoolCreateInfo cpci = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,

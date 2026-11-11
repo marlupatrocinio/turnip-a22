@@ -54,6 +54,40 @@ Measured at 835 MHz (governor settled). Values are ms/frame; lower is better.
 
 \* samples that landed at 736 MHz (DVFS) — not comparable with the 835 MHz rows.
 
+## Pipeline creation (shader compile) cost
+
+`a22bench` times `vkCreateGraphicsPipelines` for its two render passes
+(1080p and 720p, same trivial shaders). Samples, Variant A:
+
+| Scenario | 1st pipeline | 2nd pipeline |
+|---|---|---|
+| fresh process, no cache env | 1.55 ms | 0.15 ms |
+| fresh process again (same env) | 1.47 ms | 0.11 ms |
+| `MESA_SHADER_CACHE_DIR=/data/local/tmp/sc`, 1st process | 1.58 ms | 0.12 ms |
+| same, 2nd process | 1.64 ms | 0.12 ms |
+
+Interpretation:
+
+* Mesa's **in-process** cache works: the second pipeline for the same shader
+  costs ~0.1 ms instead of ~1.5 ms.
+* **No cross-process cache** is written: the cache directory stays empty and the
+  next process pays the full 1.5 ms again, with or without
+  `MESA_SHADER_CACHE_DIR`. Compiling a trivial shader is ~1.5 ms; real DXVK
+  shaders are far more expensive, which is why first-run stutter is dominated by
+  the front-end's `VkPipelineCache` handling, not by the driver's own cache.
+* Therefore: for emulation layers, make sure the front-end persists
+  `VkPipelineCache` to disk (Winlator/Eden do this in their own settings). There
+  is no driver-side switch to make this happen for them.
+
+### What would reduce stutter further
+
+* A shader corpus (hundreds of distinct SPIR-V modules) to profile and optimize
+  IR3 compile time — this is the only way to make a PGO or micro-optimization
+  case for shader compilation. The two-shader benchmark here is too small for
+  that.
+* Front-end-side: pre-warm pipeline caches per title, as some Winlator builds
+  already do.
+
 ## What this says (and does not)
 
 * Render-mode choice is **within noise** for this fill-bound workload on a
