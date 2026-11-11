@@ -16,6 +16,7 @@ turnip-a22/
 |   |-- BUILD.md
 |   |-- BUILD_INFO.md
 |   |-- VALIDATION.md
+|   |-- BENCHMARKS.md
 |   |-- RELEASING.md
 |   |-- REPO_STRUCTURE.md
 |   `-- artifacts/stock-vkjson.json
@@ -25,13 +26,15 @@ turnip-a22/
 |-- scripts/
 |   |-- build_turnip_g2gen2.sh   # reproducible Linux/CI build
 |   |-- package_driver.py        # strip + debug symbols + deterministic zip
-|   |-- build_probes.sh          # build the on-device test binaries
+|   |-- build_probes.sh          # build probe/test/benchmark binaries
 |   `-- device_test.sh           # hardware release gate (adb)
 |-- tools/
 |   |-- probe/
 |   |   |-- a22probe.c           # KGSL ioctls + HAL enumeration
 |   |   |-- a22test.c            # compute + clear/resolve verification
 |   |   |-- a22_compute.comp     # test shader
+|   |   |-- a22bench.c           # render + bandwidth benchmark
+|   |   |-- bench.vert / bench.frag
 |   |   |-- android_hwvulkan.h   # self-contained HAL ABI (NDK-only builds)
 |   |   `-- msm_kgsl.h           # KGSL uapi header (Mesa copy)
 |   `-- win/mininja.py           # Windows-host fallback build driver
