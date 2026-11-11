@@ -17,6 +17,7 @@ turnip-a22/
 |   |-- BUILD_INFO.md
 |   |-- VALIDATION.md
 |   |-- BENCHMARKS.md
+|   |-- EMULATION_TUNING.md
 |   |-- RELEASING.md
 |   |-- REPO_STRUCTURE.md
 |   `-- artifacts/stock-vkjson.json
