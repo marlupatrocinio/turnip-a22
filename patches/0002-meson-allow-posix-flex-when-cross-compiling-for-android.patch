@@ -1,0 +1,11 @@
+--- a/meson.build
++++ b/meson.build
+@@ -2188,7 +2188,7 @@
+ yacc_is_bison = true
+ needs_flex_bison = with_any_opengl or with_freedreno_vk or with_intel_tools or with_gallium
+ 
+-if build_machine.system() == 'windows'
++if build_machine.system() == 'windows' and host_machine.system() == 'windows'
+   # Prefer the winflexbison versions, they're much easier to install and have
+   # better windows support.
+ 

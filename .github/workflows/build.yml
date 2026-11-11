@@ -1,0 +1,48 @@
+name: build-turnip-a22
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential bison flex python3 python3-pip python3-venv \
+            zip unzip curl xz-utils git pkg-config
+          python3 -m pip install --break-system-packages meson ninja pyyaml packaging mako
+
+      - name: Cache Android NDK r28c
+        id: ndk-cache
+        uses: actions/cache@v4
+        with:
+          path: src/android-ndk-r28c
+          key: ndk-r28c-linux
+
+      - name: Build Turnip variants
+        run: |
+          chmod +x scripts/build_turnip_g2gen2.sh
+          ./scripts/build_turnip_g2gen2.sh
+
+      - name: Show artifacts
+        run: |
+          ls -lh dist
+          sha256sum dist/*.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: turnip-a22-adpkg
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS-*.txt
+          retention-days: 30

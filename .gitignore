@@ -1,0 +1,32 @@
+# Build inputs (fetched by scripts/build_turnip_g2gen2.sh)
+src/
+build/
+tools/py/
+tools/glslang/
+tools/winflexbison/
+tools/bin/
+!tools/bin/.gitkeep
+
+# Scratch research (not published)
+research/
+
+# Probe binaries / generated shader headers
+tools/probe/a22probe
+tools/probe/a22test
+tools/probe/*_spv.h
+
+# Local packaging output (release assets, not source)
+dist/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Profiling data
+*.profraw
+*.profdata
+
+# OS
+Thumbs.db
+.DS_Store

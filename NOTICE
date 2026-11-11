@@ -1,0 +1,29 @@
+Third-party components
+======================
+
+Mesa 3D / Turnip
+  Source:  https://gitlab.freedesktop.org/mesa/mesa
+  Version: 26.3.0 (pinned in versions.env)
+  License: MIT
+  The driver binaries in the release assets are unmodified Mesa builds plus the
+  two local patches in patches/. Mesa's copyright notices are retained in the
+  source distribution; the binaries are stripped.
+
+Android NDK / LLVM
+  Source:  https://developer.android.com/ndk
+  Version: r28c (clang 19.0.1)
+  License: Apache-2.0 with LLVM exceptions (build tool only, not redistributed)
+
+glslang
+  Source:  https://github.com/KhronosGroup/glslang
+  Version: 16.6.0
+  License: Apache-2.0 / BSD-3-Clause (build tool only, not redistributed)
+
+libadrenotools packaging schema
+  Source:  https://github.com/bylaws/libadrenotools
+  The meta.json in each package follows the ADPKG schema documented there.
+
+Trademarks
+  Qualcomm, Snapdragon, Adreno and AdrenoTools are trademarks of their
+  respective owners. This project is not affiliated with, endorsed by or
+  supported by Qualcomm Incorporated, Mesa 3D, or any emulator project.
