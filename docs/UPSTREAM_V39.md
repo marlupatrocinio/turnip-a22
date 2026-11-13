@@ -55,7 +55,24 @@ v39 also carries strings for a shader-binary cache (`MesaVkShaderBin`) and an
 on-disk-cache timestamp check that 26.3 does not have — a hint that Mesa 27 has
 shader-cache work that could matter for stutter.
 
-## Test plan (needs the device connected)
+## Measured result (device, NMS, same scene)
+
+| Run | Avg FPS | p50 | p95 | >33 ms | 60 fps frames |
+|---|---|---|---|---|---|
+| Turnip A22 26.3 (ours) | 31.8 | 33.33 | 33.33 | **1.5 %** | 20.6 % |
+| Stock Qualcomm | 29.1 | 33.33 | 50 | 9.5 % | 18.6 % |
+| v39 Mesa 27, cold cache | 24.3 | 33.33 | 66.67 | 40.7 % | 9.1 % |
+| v39 Mesa 27, warm cache | **33.1** | 16.67 | 50 | 25.3 % | 53.7 % |
+
+Mesa 27 is ~4 % faster on average and reaches 60 fps for half the frames, but
+25 % of its frames fall below 30 fps versus 1.5 % on our build. For a handheld
+targeting a stable 30, that is a regression in consistency. The first v39 run
+(24 fps) was cold shader cache: switching drivers forces full recompilation.
+
+**Verdict: do not bump Mesa on this evidence.** Revisit when 27.0 is released
+and the frame pacing can be re-measured; nothing else in v39 is A22-applicable.
+
+## Test plan (historical)
 
 1. Run `tools/probe/a22test` against `Turnip_v27.0.0-R2.zip`'s
    `libvulkan_freedreno.so` — does a Mesa 27 build even pass the gate on A22?
