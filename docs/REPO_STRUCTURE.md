@@ -20,6 +20,7 @@ turnip-a22/
 |   |-- EMULATION_TUNING.md
 |   |-- BUG-GMEM.md
 |   |-- FIELD_TEST_NMS.md
+|   |-- UPSTREAM_V39.md
 |   |-- RELEASING.md
 |   |-- REPO_STRUCTURE.md
 |   `-- artifacts/stock-vkjson.json
