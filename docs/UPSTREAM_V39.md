@@ -69,6 +69,20 @@ Mesa 27 is ~4 % faster on average and reaches 60 fps for half the frames, but
 targeting a stable 30, that is a regression in consistency. The first v39 run
 (24 fps) was cold shader cache: switching drivers forces full recompilation.
 
+### BOTW (Eden) on the same test spot
+
+| Run | Avg FPS | p50 | p95 | Frames >33 ms | GPU busy |
+|---|---|---|---|---|---|
+| Turnip A22 26.3, run 1 | 29.1 | 33.33 | 50 | 7.2 % | ~62 % |
+| Turnip A22 26.3, run 2 | 28.8 | 33.33 | 50 | 6.2 % | ~62 % |
+| v39 Mesa 27, run 1 (cold cache) | 27.3 | 33.33 | 50 | 22.5 % | 62 % |
+| v39 Mesa 27, run 2 (warm cache) | 27.1 | 33.33 | 50 | 24.7 % | 65 % |
+
+Rendering was correct on v39 (no corruption). GPU busy is only 62-65 %, so BOTW
+is CPU-bound in Eden: the gap is driver CPU overhead, not GPU work, and a warm
+shader cache does not close it. v39 is ~7 % slower and stutters roughly three
+times as often.
+
 **Verdict: do not bump Mesa on this evidence.** Revisit when 27.0 is released
 and the frame pacing can be re-measured; nothing else in v39 is A22-applicable.
 
