@@ -15,7 +15,7 @@ Qualcomm driver, on the same scene.
 | Scene | planet "Kohola XVIII", red biome, fixed position, no movement |
 | Capture | `dumpsys SurfaceFlinger --latency` on the GameNative SurfaceView, 45 s per driver |
 
-Drivers compared: stock Qualcomm (system) vs `turnip-a22-26.3.0-variantB`
+Drivers compared: stock Qualcomm (system) vs `turnip-a22-26.3.0`
 (Adreno A22 profile, default autotuner, no debug properties).
 
 An earlier stock sample was taken on a different biome and is excluded — the

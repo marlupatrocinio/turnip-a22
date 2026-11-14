@@ -35,8 +35,8 @@ Both forcing paths reproduce it:
 
 | Test | Result | Conclusion |
 |---|---|---|
-| Variant A (generic ISA) + `gmem` | corrupt | not an ARMv8.6 codegen issue |
-| Variant B + `gmem` | corrupt | — |
+| generic `armv8-a` build + `gmem` | corrupt | not an ARMv8.6 codegen issue |
+| ARMv8.6-A build + `gmem` | corrupt | — |
 | `gmem,nolrz` | corrupt | LRZ not involved |
 | `gmem,noubwc` | corrupt | UBWC not involved |
 | `num_ccu=2` in the device profile + `gmem` | **device loss** (GPU hang) | CCU count hypothesis rejected |
@@ -76,7 +76,7 @@ does not.
 2. **Build-time safe mode** — [`patches/optional/0003-force-sysmem-on-adreno-a22.patch`](../patches/optional/0003-force-sysmem-on-adreno-a22.patch)
    forces SYSMEM for `chip_id 0x43030b00` inside `use_sysmem_rendering()`. Not
    applied by default because of the cost above; useful for a "compatibility"
-   variant.
+   build.
 
 3. **Do not use** `TU_AUTOTUNE_ALGO=prefer_gmem` or `TU_DEBUG=gmem` on this
    device.

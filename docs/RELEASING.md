@@ -35,10 +35,8 @@ ls -lh dist
 Expected artifacts (all deterministic, see §6):
 
 ```
-turnip-a22-26.3.0-variantA.adpkg.zip
-turnip-a22-26.3.0-variantA.debug.zip
-turnip-a22-26.3.0-variantB.adpkg.zip
-turnip-a22-26.3.0-variantB.debug.zip
+turnip-a22-26.3.0.adpkg.zip
+turnip-a22-26.3.0.debug.zip
 SHA256SUMS.txt
 ```
 
@@ -48,8 +46,7 @@ Local (device attached, faster):
 
 ```bash
 bash scripts/build_probes.sh
-bash scripts/device_test.sh dist/turnip-a22-26.3.0-variantA.adpkg.zip
-bash scripts/device_test.sh dist/turnip-a22-26.3.0-variantB.adpkg.zip
+bash scripts/device_test.sh dist/turnip-a22-26.3.0.adpkg.zip
 ```
 
 Expected tail:
@@ -63,7 +60,7 @@ PASS: driver gate satisfied
 Or via CI once the package is on a release/tag:
 
 ```
-Actions → device-test → Run workflow → tag: v26.3.0-a22.2
+Actions → device-test → Run workflow → tag: v26.3.0-a22.3
 ```
 
 **Do not continue if the gate fails.** Record the output in the issue tracker and
@@ -75,8 +72,8 @@ fix the cause; a tag is cheap, a bad release is not.
 git add -A
 git commit -m "Turnip A22 26.3.0: deterministic packaging, debug symbols, device gate"
 git push
-git tag -a v26.3.0-a22.2 -m "Turnip A22 26.3.0 (packaging v2)"
-git push origin v26.3.0-a22.2
+git tag -a v26.3.0-a22.3 -m "Turnip A22 26.3.0 (packaging v2)"
+git push origin v26.3.0-a22.3
 ```
 
 Tags are immutable. If something is wrong after pushing, cut the next tag; never
@@ -87,18 +84,16 @@ move or delete a published one.
 Workflow (rebuilds from the tag, then publishes):
 
 ```bash
-gh workflow run release.yml -f tag=v26.3.0-a22.2
+gh workflow run release.yml -f tag=v26.3.0-a22.3
 gh run watch
 ```
 
 or attach the locally gated artifacts (what was actually tested):
 
 ```bash
-gh release create v26.3.0-a22.2 \
-  dist/turnip-a22-26.3.0-variantA.adpkg.zip \
-  dist/turnip-a22-26.3.0-variantB.adpkg.zip \
-  dist/turnip-a22-26.3.0-variantA.debug.zip \
-  dist/turnip-a22-26.3.0-variantB.debug.zip \
+gh release create v26.3.0-a22.3 \
+  dist/turnip-a22-26.3.0.adpkg.zip \
+  dist/turnip-a22-26.3.0.debug.zip \
   dist/SHA256SUMS.txt \
   --title "Turnip A22 26.3.0" \
   --generate-notes
@@ -110,9 +105,9 @@ the workflow; for a manual release add it explicitly.
 ## 5. Verify
 
 ```bash
-gh release view v26.3.0-a22.2
+gh release view v26.3.0-a22.3
 # download one asset and compare
-curl -L -o /tmp/a.zip "$(gh release view v26.3.0-a22.2 --json assets -q '.assets[] | select(.name|endswith("variantA.adpkg.zip")) | .url')"
+curl -L -o /tmp/a.zip "$(gh release view v26.3.0-a22.3 --json assets -q '.assets[] | select(.name|endswith("turnip-a22-26.3.0.adpkg.zip")) | .url')"
 sha256sum /tmp/a.zip   # must match SHA256SUMS.txt
 minisign -Vm SHA256SUMS.txt -p minisign.pub   # if signed
 ```
@@ -129,7 +124,7 @@ minisign -Vm SHA256SUMS.txt -p minisign.pub   # if signed
   only contain `meta.json` + the driver. Symbolize a tombstone address with:
 
   ```bash
-  unzip turnip-a22-26.3.0-variantA.debug.zip
+  unzip turnip-a22-26.3.0.debug.zip
   llvm-symbolizer --obj=libvulkan_freedreno.so.debug 0xb90f3c
   ```
 
@@ -140,7 +135,7 @@ minisign -Vm SHA256SUMS.txt -p minisign.pub   # if signed
 
 - [ ] `git status` clean, only the intended files staged
 - [ ] `./scripts/build_turnip_g2gen2.sh` succeeds from a clean checkout
-- [ ] device gate passes for **both** variants
+- [ ] device gate passes
 - [ ] `dist/stage-*/libvulkan_freedreno.so` matches the previously validated hash
 - [ ] `SHA256SUMS.txt` lists every attached asset
 - [ ] README validation section reflects this run

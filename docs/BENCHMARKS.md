@@ -41,7 +41,7 @@ adb shell "TU_AUTOTUNE_ALGO=prefer_sysmem LD_LIBRARY_PATH=/data/local/tmp /data/
 
 Env knobs: `BENCH_FRAMES`, `BENCH_DRAWS`, `BENCH_WIDTH`, `BENCH_HEIGHT`.
 
-## Baseline — 2026-11-11, Variant A/B (Mesa 26.3.0)
+## Baseline — 2026-11-11 (Mesa 26.3.0)
 
 Measured at 835 MHz (governor settled). Values are ms/frame; lower is better.
 
@@ -57,7 +57,7 @@ Measured at 835 MHz (governor settled). Values are ms/frame; lower is better.
 ## Pipeline creation (shader compile) cost
 
 `a22bench` times `vkCreateGraphicsPipelines` for its two render passes
-(1080p and 720p, same trivial shaders). Samples, Variant A:
+(1080p and 720p, same trivial shaders). Samples:
 
 | Scenario | 1st pipeline | 2nd pipeline |
 |---|---|---|

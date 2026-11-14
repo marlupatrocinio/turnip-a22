@@ -20,7 +20,7 @@ instrumentation flags, so it is allowed.
 
 1. Built an instrumented driver with
    `-fprofile-instr-generate` (compile and link), same release configuration as
-   Variant A otherwise.
+   the shipped build otherwise.
 2. Ran a corpus on the device with `LLVM_PROFILE_FILE=/data/local/tmp/prof/%p-%m.profraw`:
    * `a22test` twice — instance/device creation, compute pipeline, image clear
      and copy, submission and fence paths;
@@ -36,7 +36,7 @@ Draw submission (64×64, 4000 draws, both samples at 736 MHz):
 
 | Build | run 1 | run 2 |
 |---|---|---|
-| stock Variant A | 1.477 ms | 1.584 ms |
+| stock build | 1.477 ms | 1.584 ms |
 | PGO | 1.492 ms | 1.478 ms |
 
 Means 1.53 vs 1.49 ms (~3 %), but the spread between runs of the *same* build is
@@ -46,7 +46,7 @@ Means 1.53 vs 1.49 ms (~3 %), but the spread between runs of the *same* build is
 
 | Build | run 1 | run 2 | clock |
 |---|---|---|---|
-| stock Variant A | 3.886 ms | 3.924 ms | 835 MHz |
+| stock build | 3.886 ms | 3.924 ms | 835 MHz |
 | PGO | 3.539 ms | 3.371 ms | **950 MHz** |
 
 Normalising by frequency (950/835 = 1.138) gives stock ≈ 3.41–3.45 ms at

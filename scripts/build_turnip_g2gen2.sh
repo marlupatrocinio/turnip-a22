@@ -1,17 +1,18 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # Build Turnip (Mesa Vulkan) for the Snapdragon G2 Gen 2 / Adreno A22.
 #
-# Produces two AdrenoTools packages in dist/:
-#   turnip-a22-<ver>-variantA.adpkg.zip   balanced, generic ARMv8-A
-#   turnip-a22-<ver>-variantB.adpkg.zip   ARMv8.6-A ISA optimised
+# Produces in dist/:
+#   turnip-a22-<ver>.adpkg.zip    AdrenoTools package (meta.json + stripped HAL)
+#   turnip-a22-<ver>.debug.zip    separate debug symbols
+#   SHA256SUMS.txt                deterministic hashes
 #
 # Requirements: git, curl, xz, bison, flex, python3 (>=3.10), pip, zip,
 #               glslangValidator >= 12.2, Android NDK r27c+ (r28c default).
 #
 # Usage:
-#   ./scripts/build_turnip_g2gen2.sh                 # download NDK+Mesa, build both
+#   ./scripts/build_turnip_g2gen2.sh
 #   NDK=/opt/android-ndk-r28c ./scripts/build_turnip_g2gen2.sh
-#   MESA_SRC=/src/mesa ./scripts/build_turnip_g2gen2.sh --variant A
+#   MESA_SRC=/src/mesa ./scripts/build_turnip_g2gen2.sh
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -30,7 +31,6 @@ NDK_VERSION="${NDK_VERSION:-r28c}"
 NDK="${NDK:-$HERE/src/android-ndk-$NDK_VERSION}"
 API="${API:-35}"
 JOBS="${JOBS:-$(nproc)}"
-VARIANT="${VARIANT:-all}"
 WORK="${WORK:-$HERE/build}"
 DIST="$HERE/dist"
 
@@ -85,9 +85,9 @@ for p in "$HERE"/patches/*.patch; do
     fi
 done
 
-# ------------------------------------------------------------- cross files
-write_cross() { # $1=path $2=extra cflags
-    cat > "$1" <<EOF
+# ------------------------------------------------------------- cross file
+CROSS="$WORK/cross-a22.txt"
+cat > "$CROSS" <<EOF
 [binaries]
 c = ['$TOOLCHAIN/clang', '--target=aarch64-linux-android$API', '--sysroot=$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot']
 cpp = ['$TOOLCHAIN/clang++', '--target=aarch64-linux-android$API', '--sysroot=$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot']
@@ -106,51 +106,37 @@ endian = 'little'
 needs_exe_wrapper = true
 
 [built-in options]
-c_args = ['-DANDROID', '-D__ANDROID_API__=$API', '-fPIC'$2]
-cpp_args = ['-DANDROID', '-D__ANDROID_API__=$API', '-fPIC'$2]
+c_args = ['-DANDROID', '-D__ANDROID_API__=$API', '-fPIC', '-march=armv8.6-a+crypto+crc+dotprod+fp16+i8mm+bf16', '-fomit-frame-pointer', '-fno-semantic-interposition']
+cpp_args = ['-DANDROID', '-D__ANDROID_API__=$API', '-fPIC', '-march=armv8.6-a+crypto+crc+dotprod+fp16+i8mm+bf16', '-fomit-frame-pointer', '-fno-semantic-interposition']
 c_link_args = ['-fuse-ld=lld']
 cpp_link_args = ['-fuse-ld=lld', '-static-libstdc++']
 c_std = 'c11'
 cpp_std = 'c++17'
 EOF
-}
 
-build_variant() { # $1=A|B $2=extra cflags string (ninja format)
-    local v="$1" extra="$2" bdir="$WORK/mesa-var$v"
-    log "configuring variant $v"
-    rm -rf "$bdir"
-    write_cross "$WORK/cross-$v.txt" "$extra"
-    meson setup "$bdir" "$MESA_SRC" \
-        --cross-file "$WORK/cross-$v.txt" \
-        --buildtype=release -Db_ndebug=true -Dstrip=false \
-        -Dplatforms=android -Dplatform-sdk-version="$API" -Dandroid-stub=true \
-        -Dvulkan-drivers=freedreno -Dgallium-drivers= -Dfreedreno-kmds=kgsl \
-        -Dglx=disabled -Degl=disabled -Dgbm=disabled -Dgles1=disabled -Dgles2=disabled \
-        -Dopengl=false -Dllvm=disabled -Dshared-glapi=disabled \
-        -Dandroid-libbacktrace=disabled -Dvideo-codecs= -Dbuild-tests=false -Dtools= \
-        -Dvalgrind=disabled -Dvulkan-beta=true -Dwerror=false
-    log "building variant $v"
-    ninja -C "$bdir" -j "$JOBS"
-    local so="$bdir/src/freedreno/vulkan/libvulkan_freedreno.so"
-    [ -f "$so" ] || die "build produced no $so"
-    log "packaging variant $v"
-    python3 "$HERE/scripts/package_driver.py" --so "$so" --variant "$v" \
-        --version "$MESA_VERSION" --strip-tool "$TOOLCHAIN/llvm-strip" \
-        --objcopy-tool "$TOOLCHAIN/llvm-objcopy" --out "$DIST"
-}
+# -------------------------------------------------------------------- build
+BDIR="$WORK/mesa-a22"
+log "configuring"
+rm -rf "$BDIR"
+meson setup "$BDIR" "$MESA_SRC" \
+    --cross-file "$CROSS" \
+    --buildtype=release -Db_ndebug=true -Dstrip=false \
+    -Dplatforms=android -Dplatform-sdk-version="$API" -Dandroid-stub=true \
+    -Dvulkan-drivers=freedreno -Dgallium-drivers= -Dfreedreno-kmds=kgsl \
+    -Dglx=disabled -Degl=disabled -Dgbm=disabled -Dgles1=disabled -Dgles2=disabled \
+    -Dopengl=false -Dllvm=disabled -Dshared-glapi=disabled \
+    -Dandroid-libbacktrace=disabled -Dvideo-codecs= -Dbuild-tests=false -Dtools= \
+    -Dvalgrind=disabled -Dvulkan-beta=true -Dwerror=false
 
-A_EXTRA=""
-B_EXTRA=", '-march=armv8.6-a+crypto+crc+dotprod+fp16+i8mm+bf16', '-fomit-frame-pointer', '-fno-semantic-interposition'"
+log "building"
+ninja -C "$BDIR" -j "$JOBS"
+SO="$BDIR/src/freedreno/vulkan/libvulkan_freedreno.so"
+[ -f "$SO" ] || die "build produced no $SO"
 
-case "$VARIANT" in
-    A) build_variant A "" ;;
-    B) build_variant B "$B_EXTRA" ;;
-    all) build_variant A ""; build_variant B "$B_EXTRA" ;;
-    *) die "unknown VARIANT=$VARIANT (A|B|all)" ;;
-esac
+log "packaging"
+python3 "$HERE/scripts/package_driver.py" --so "$SO" \
+    --version "$MESA_VERSION" --strip-tool "$TOOLCHAIN/llvm-strip" \
+    --objcopy-tool "$TOOLCHAIN/llvm-objcopy" --out "$DIST"
 
-( cd "$DIST" && sha256sum *.zip > SHA256SUMS.txt )
-
-log "done - packages in $DIST"
-ls -lh "$DIST"/*.zip
-
+log "done - artifacts in $DIST"
+ls -lh "$DIST"/*.zip "$DIST/SHA256SUMS.txt"

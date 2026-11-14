@@ -7,7 +7,7 @@ turnip-a22/
 |-- .github/
 |   |-- ISSUE_TEMPLATE/bug_report.yml
 |   `-- workflows/
-|       |-- build.yml            # build both variants on push/PR
+|       |-- build.yml            # build on push/PR
 |       |-- device-test.yml      # hardware gate on a self-hosted runner
 |       `-- release.yml          # manual publish from an existing tag
 |-- docs/
@@ -70,6 +70,7 @@ turnip-a22/
 | `dist/*.zip` | binary blobs bloat the history forever | GitHub **Releases** (assets), checksums attached |
 | `tools/py/`, `tools/glslang/`, `tools/bin/` | installed toolchain wheels/binaries | pip / release download |
 | `research/` | scratch downloaders and one-off probes | not published |
+| `dist-test/` | throwaway test packages with their own meta | not published |
 
 `.gitignore` enforces this. Keep `dist/` as a local output folder only.
 
@@ -77,8 +78,8 @@ turnip-a22/
 
 * Tag format: `v<mesa>-a22.<n>` — e.g. `v26.3.0-a22.1`.
 * Each release attaches:
-  * `turnip-a22-26.3.0-variantA.adpkg.zip`
-  * `turnip-a22-26.3.0-variantB.adpkg.zip`
+  * `turnip-a22-26.3.0.adpkg.zip`
+  * `turnip-a22-26.3.0.debug.zip`
   * `SHA256SUMS.txt`
   * short release notes: what changed, validation performed, known issues
 * `packageVersion` inside `meta.json` is bumped per release so front-ends can
@@ -112,7 +113,7 @@ git branch -M main
 git remote add origin git@github.com:<you>/turnip-a22.git
 git push -u origin main
 
-git tag -a v26.3.0-a22.1 -m "Turnip A22 26.3.0 (A/B)"
+git tag -a v26.3.0-a22.3 -m "Turnip A22 26.3.0"
 git push origin v26.3.0-a22.1     # tag only; publishing stays manual
 ```
 
@@ -121,21 +122,21 @@ thing users download (a tag build would otherwise race the local artifacts):
 
 ```bash
 # Option 1: attach the locally validated packages
-gh release create v26.3.0-a22.1 \
-  dist/turnip-a22-26.3.0-variantA.adpkg.zip \
-  dist/turnip-a22-26.3.0-variantB.adpkg.zip \
+gh release create v26.3.0-a22.3 \
+  dist/turnip-a22-26.3.0.adpkg.zip \
+  dist/turnip-a22-26.3.0.debug.zip \
   dist/SHA256SUMS.txt \
   --title "Turnip A22 26.3.0" --generate-notes
 
 # Option 2: let CI build and publish from the tag
-gh workflow run release.yml -f tag=v26.3.0-a22.1
+gh workflow run release.yml -f tag=v26.3.0-a22.3
 ```
 
 Before tagging, confirm:
 
 - [ ] `./scripts/build_turnip_g2gen2.sh` succeeds from a clean checkout
-- [ ] device gate passes for both variants (`scripts/device_test.sh`)
-- [ ] both zips install and boot in at least one front-end
+- [ ] device gate passes (`scripts/device_test.sh`)
+- [ ] the package installs and boots in at least one front-end
 - [ ] `sha256sum dist/*.zip` matches the attached `SHA256SUMS.txt`
 - [ ] README "Validation" section reflects the current run
 - [ ] `versions.env` pins the exact Mesa/NDK used

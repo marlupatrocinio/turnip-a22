@@ -17,6 +17,7 @@ tools/probe/*_spv.h
 
 # Local packaging output (release assets, not source)
 dist/
+dist-test/
 
 # Python
 __pycache__/

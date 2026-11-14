@@ -29,10 +29,9 @@ body:
   - type: dropdown
     id: variant
     attributes:
-      label: Driver variant
+      label: Driver package
       options:
-        - Variant A (Balanced)
-        - Variant B (Performance)
+        - Release package
         - Custom build
     validations:
       required: true
@@ -42,7 +41,7 @@ body:
     attributes:
       label: Package version
       description: The `driverVersion` / package name shown by the front-end, or the zip name
-      placeholder: e.g. 26.3.0-a22a (turnip-a22-26.3.0-variantA.adpkg.zip)
+      placeholder: e.g. 26.3.0 (turnip-a22-26.3.0.adpkg.zip)
     validations:
       required: true
 

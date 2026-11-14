@@ -1,7 +1,7 @@
 name: release
 
 # Manual publishing. Run from the Actions tab (or `gh workflow run release.yml
-# -f tag=v26.3.0-a22.2`) after the tag exists and the packages have been
+# -f tag=v26.3.0-a22.3`) after the tag exists and the packages have been
 # validated on hardware with the device-test workflow. Tag pushes do not
 # auto-publish, so hardware-validated artifacts can be the ones users get.
 
@@ -42,7 +42,7 @@ jobs:
           path: src/android-ndk-r28c
           key: ndk-r28c-linux
 
-      - name: Build both variants
+      - name: Build Turnip
         run: |
           chmod +x scripts/build_turnip_g2gen2.sh
           ./scripts/build_turnip_g2gen2.sh

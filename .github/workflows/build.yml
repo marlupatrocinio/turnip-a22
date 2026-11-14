@@ -29,7 +29,7 @@ jobs:
           path: src/android-ndk-r28c
           key: ndk-r28c-linux
 
-      - name: Build Turnip variants
+      - name: Build Turnip
         run: |
           chmod +x scripts/build_turnip_g2gen2.sh
           ./scripts/build_turnip_g2gen2.sh

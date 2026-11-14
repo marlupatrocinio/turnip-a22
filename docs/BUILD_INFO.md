@@ -18,7 +18,7 @@
 | glslang | 16.6.0 (Turnip needs >= 12.2 for BVH shaders) |
 | Patches | `0001-freedreno-add-A22-device-id.patch`, `0002-meson-allow-posix-flex-when-cross-compiling-for-android.patch` |
 
-## Meson configuration (both variants)
+## Meson configuration
 
 ```
 --buildtype=release -Db_ndebug=true
@@ -31,12 +31,10 @@
 cpp_link_args: -fuse-ld=lld -static-libstdc++
 ```
 
-Variant A: generic `armv8-a` (NDK default).
-Variant B: `-march=armv8.6-a+crypto+crc+dotprod+fp16+i8mm+bf16`,
-`-fomit-frame-pointer`, `-fno-semantic-interposition`.
-
-Both are stripped with `llvm-strip --strip-unneeded` and depend only on system
-libraries (no `libc++_shared.so`).
+Compiler flags: `-march=armv8.6-a+crypto+crc+dotprod+fp16+i8mm+bf16`,
+`-fomit-frame-pointer`, `-fno-semantic-interposition`. The library is stripped
+with `llvm-strip --strip-unneeded` and depends only on system libraries (no
+`libc++_shared.so`).
 
 ## Validation (on device, shell user)
 

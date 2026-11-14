@@ -2,200 +2,128 @@
 
 # Turnip A22
 
-**A from-source Mesa Turnip driver package for the Snapdragon G2 Gen 2 handheld — Adreno (TM) 22 / `gen7-11-0`.**
+**Mesa Turnip (Vulkan) for the Snapdragon G2 Gen 2 handheld — Adreno (TM) 22, `chip_id 0x43030b00`, `gen7-11-0`.**
 
 [![Mesa](https://img.shields.io/badge/Mesa-26.3.0-2b6cb0)](https://mesa3d.org)
 [![Android](https://img.shields.io/badge/Android-15%20%2F%20API%2035-3ddc84)](https://developer.android.com)
-[![GPU](https://img.shields.io/badge/GPU-Adreno%20A22-e53e3e)](#supported-devices)
+[![Vulkan](https://img.shields.io/badge/Vulkan-1.4.363-e53e3e)](#verification)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![Status](https://img.shields.io/badge/status-validated%20on%20hardware-success)](#validation)
 
 </div>
 
 ---
 
-Turnip A22 builds [Mesa 3D](https://gitlab.freedesktop.org/mesa/mesa)'s freedreno
-Vulkan driver for Qualcomm's handheld SoC and packages it as an
-[AdrenoTools](https://github.com/bylaws/libadrenotools) driver — the same
-mechanism Winlator, GameHub, Eden, Citron, ARMSX2 and Vita3K use to load custom
-user-space drivers without root.
+Mesa 26.3.0 freedreno build packaged as an Android Vulkan HAL for
+[AdrenoTools](https://github.com/bylaws/libadrenotools) front-ends. No root.
 
-It exists because the Snapdragon G2 Gen 2 sits in an awkward spot: it is new
-consumer hardware, but its GPU is the **7.11.0 generation already known to Mesa
-as Adreno 735**, so most "custom driver" repos either ignore it or ship builds
-tuned for 8-series flagship parts. This repo pins down what the silicon actually
-is, builds it properly, and validates the result on a real device.
+## Target hardware
 
-## Why another Turnip build?
-
-| | |
+| Field | Value |
 |---|---|
-| **Misidentified hardware** | The stock blob calls it `Adreno (TM) 22`; Mesa matches it through the A735 wildcard, so drivers report `Adreno (TM) 735`. Both are the same `gen7-11-0` die. This build adds an exact-match identity so logs, bug reports and per-device expectations are truthful. |
-| **Wrong build flags** | `-march=armv9-a` looks right but LLVM implies SVE, which these Kryo cores do not implement — the driver dies with `SIGILL` at device enumeration. This repo documents that and ships an `armv8.6-a` build that actually runs. |
-| **Needs the right HAL form** | AdrenoTools needs an Android Vulkan **HAL** (`HMI`), not a desktop ICD. The build here produces one, with `libc++` statically linked so there is no `libc++_shared.so` to bundle or collide with. |
-| **Nothing validated** | Community packages are rarely tested beyond "a game booted". This one ships the test binaries used to verify it: HAL load, compute dispatch, and a tiled image clear/resolve with per-pixel checks. |
+| SoC | Qualcomm Snapdragon G2 Gen 2 (`SG6275P`) |
+| GPU | Adreno (TM) 22, `chip_id 0x43030b00`, DT `qcom,adreno-gpu-gen7-11-0` |
+| GMEM / UBWC | 1.5 MiB (`0x180000`), UBWC 4.0, `highest_bank_bit` 16 |
+| OS | Android 9+ (API 28+), arm64 |
 
-> Upstream Mesa already boots on this hardware. If you only want a stock Turnip
-> build, any recent Mesa will work. What this project adds is a **correct,
-> reproducible, hardware-validated package** — not a new GPU backend.
+Device identity is exact-match (`Adreno (TM) 22`), not the Adreno 735 wildcard.
 
-## Supported devices
+## Artifacts
 
-| Device | SoC | GPU | Status |
-|---|---|---|---|
-| Retroid Pocket G2 (Moorechip) | Snapdragon G2 Gen 2 (`SG6275P`) | Adreno (TM) 22, `chip_id 0x43030b00`, `gen7-11-0` | ✅ built and validated on hardware |
-| Other `gen7-11-0` parts (Adreno 735 class) | — | same `chip_id` family | ⚠️ expected to work, not tested here |
+| File | Contents |
+|---|---|
+| `turnip-a22-26.3.0.adpkg.zip` | `meta.json` + stripped `libvulkan_freedreno.so` |
+| `turnip-a22-26.3.0.debug.zip` | `libvulkan_freedreno.so.debug` (build-id matched) |
+| `SHA256SUMS.txt` | deterministic hashes for both |
 
-Requirements: arm64 Android 9+ (API 28+), a front-end that supports
-AdrenoTools driver import. No root.
-
-## Packages
-
-| Variant | ISA | Size | Use it when |
-|---|---|---|---|
-| **A — Balanced** | generic `armv8-a` | ~2.6 MB zip | Default. Maximum compatibility, validated. |
-| **B — Performance** | `armv8.6-a+crypto+crc+dotprod+fp16+i8mm+bf16` | ~2.6 MB zip | You have this exact SoC family and want ISA-specific codegen. Same driver, same validation. |
-
-Both are Mesa 26.3.0, `-O3` release, assertions and debug logging compiled out,
-`libc++` statically linked, and fully stripped. Download the latest `.adpkg.zip`
-from [Releases](../../releases).
-
-Each release also ships separate `*.debug.zip` symbol archives and a
-deterministic `SHA256SUMS.txt` (same inputs → same hash). How the hardware gate
-and publishing work: [docs/RELEASING.md](docs/RELEASING.md).
+Build flags: `-O3`, `-DNDEBUG`, `-march=armv8.6-a+crypto+crc+dotprod+fp16+i8mm+bf16`,
+`-fomit-frame-pointer`, `-fno-semantic-interposition`, `-static-libstdc++`,
+`-Wl,--gc-sections`, `llvm-strip --strip-unneeded`. Dependencies: system libraries
+only (`libc`, `libm`, `libdl`, `libz`, `liblog`, `libhardware`,
+`libnativewindow`, `libsync`).
 
 ## Install
 
-1. Copy the zip to the device (`adb push turnip-a22-*.adpkg.zip /sdcard/Download/`).
-2. Open your emulator's **GPU driver manager** (Winlator: *Adrenotools GPU
-   Drivers → Install*; Eden: *Settings → GPU → Install driver*).
-3. Select the zip, then activate **Turnip A22 Balanced**.
-4. Launch a title.
-
-Expected in the app's driver info or `adb logcat`: `Turnip Adreno (TM) 22`,
-Vulkan `1.4.363`. To uninstall, delete the driver from the same manager — nothing
-outside the app's private storage is touched.
-
-## Validation
-
-Tested over ADB on a Retroid Pocket G2 (Android 15 / SDK 35, kernel 6.1.115),
-using the binaries in [`tools/probe/`](tools/probe):
-
-```
-HAL load (HMI)            PASS, vkCreateInstance PASS
-Device                    Turnip Adreno (TM) 22, Vulkan 1.4.363
-Compute dispatch          64/64 correct
-Image clear + resolve     262144/262144 pixels correct
-Compute submit round-trip 0.230–0.254 ms
+```bash
+adb push turnip-a22-26.3.0.adpkg.zip /sdcard/Download/
 ```
 
-Both variants, stripped exactly as shipped, pass. Raw output and method:
-[docs/VALIDATION.md](docs/VALIDATION.md).
+Import the zip in the front-end's driver manager (Winlator: *Adrenotools GPU
+Drivers*; Eden: *Settings → GPU → Install driver*) and select **Turnip A22**.
 
-Not covered yet: real game titles, Vulkan CTS (`dEQP`), long thermal soaks.
+Expected: `Turnip Adreno (TM) 22`, Vulkan `1.4.363`. Uninstalling is done from the
+same manager; nothing outside the app's private storage is modified.
 
-## Building
+## Verification
+
+Run on hardware (Retroid Pocket G2, Android 15 / SDK 35, kernel 6.1.115) with the
+shipped stripped library:
+
+```
+HAL load (HMI), vkCreateInstance   PASS
+deviceName / apiVersion            Turnip Adreno (TM) 22 / 1.4.363
+compute dispatch                   64/64 invocations correct
+image clear + tiled resolve        262144/262144 pixels correct
+compute submit round-trip          0.24 ms
+```
+
+Field tests, same scene and settings, 45–180 s captures:
+
+| Title / stack | Metric | Stock Qualcomm | This build |
+|---|---|---|---|
+| No Man's Sky, GameNative, 720p low | avg / p95 / frames >33 ms | 29.1 fps / 50 ms / 9.5 % | **31.8 fps / 33.33 ms / 1.5 %** |
+| Zelda: BOTW, Eden | avg / frames >33 ms | — | 29.1 fps / 6.2–7.2 % |
+
+Method and raw data: [`docs/VALIDATION.md`](docs/VALIDATION.md),
+[`docs/FIELD_TEST_NMS.md`](docs/FIELD_TEST_NMS.md).
+
+## Build
 
 ```bash
-git clone https://github.com/<you>/turnip-a22
-cd turnip-a22
 ./scripts/build_turnip_g2gen2.sh
-# -> dist/turnip-a22-26.3.0-variant{A,B}.adpkg.zip
+# -> dist/turnip-a22-26.3.0.adpkg.zip
+#    dist/turnip-a22-26.3.0.debug.zip
+#    dist/SHA256SUMS.txt
 ```
 
-The script downloads the pinned Mesa and NDK versions from
-[`versions.env`](versions.env), applies [`patches/`](patches), builds both
-variants, strips and packages them. CI does the same on every push
-([`.github/workflows/build.yml`](.github/workflows/build.yml)); publishing is a
-manual step that attaches validated packages to an existing tag
-([`.github/workflows/release.yml`](.github/workflows/release.yml)).
+Pinned inputs in [`versions.env`](versions.env); two local Mesa patches in
+[`patches/`](patches). Toolchain, cross file and host notes:
+[`docs/BUILD.md`](docs/BUILD.md).
 
-Before publishing, run the hardware gate:
+Release gate before publishing:
 
 ```bash
 bash scripts/build_probes.sh
-bash scripts/device_test.sh dist/turnip-a22-26.3.0-variantA.adpkg.zip
+bash scripts/device_test.sh dist/turnip-a22-26.3.0.adpkg.zip
 ```
 
-or trigger the [`device-test`](.github/workflows/device-test.yml) workflow on a
-self-hosted runner with the device attached. Full release process:
-[docs/RELEASING.md](docs/RELEASING.md).
+## Runtime knobs
 
-Full toolchain details, cross files and Windows-host notes:
-[docs/BUILD.md](docs/BUILD.md).
+| Variable | Values |
+|---|---|
+| `TU_AUTOTUNE_ALGO` | `bandwidth` (default), `profiled`, `profiled_imm`, `prefer_sysmem` |
+| `TU_AUTOTUNE_FLAGS` | `big_gmem`, `tune_small`, `preempt_optimize` |
+| `TU_DEBUG` | `startup`, `sysmem`, `nobin`, `noubwc`, `nolrz`, `flushall`, `perf` |
+| `TU_GMEM` | override detected GMEM (diagnostics) |
+| `FD_DEV_FEATURES` | `has_*=0/1` |
 
-## Tuning
+On this GPU, forcing tiled rendering (`TU_DEBUG=gmem`,
+`TU_AUTOTUNE_ALGO=prefer_gmem`) corrupts output; use `TU_DEBUG=sysmem` if a title
+misrenders. Details: [`docs/BUG-GMEM.md`](docs/BUG-GMEM.md).
 
-The driver auto-detects the 1.5 MiB GMEM, UBWC 4.0 mode and bank bits from KGSL.
-Runtime knobs for per-title experiments:
-
-| Variable | Values | Notes |
-|---|---|---|
-| `TU_AUTOTUNE_ALGO` | `bandwidth` (default), `profiled`, `profiled_imm`, `prefer_sysmem`, `prefer_gmem` | GMEM vs SYSMEM render-pass heuristic |
-| `TU_AUTOTUNE_FLAGS` | `big_gmem`, `tune_small`, `preempt_optimize` | autotuner modifiers |
-| `TU_GMEM` | `1572864` | override detected GMEM (diagnostics only) |
-| `TU_DEBUG` | `startup`, `sysmem`, `gmem`, `nobin`, `noubwc`, `nolrz`, `flushall`, `perf`, … | force render modes / disable features |
-| `FD_DEV_FEATURES` | `has_*=0/1` | override individual device features |
-
-DXVK/VKD3D-Proton already get `tu_autotune_algorithm="prefer_sysmem"` from
-upstream's baked-in driconf, which is the right default for a small-GMEM part.
-
-> **Known issue:** forcing tiled rendering (`TU_DEBUG=gmem`, or
-> `TU_AUTOTUNE_ALGO=prefer_gmem`) corrupts rendering on this GPU — black player
-> models, broken lighting. The default autotuner is correct **and** faster, so
-> leave it alone. If a title shows corruption, force the opposite way with
-> `TU_DEBUG=sysmem`. Details, evidence and an opt-in build patch:
-> [docs/BUG-GMEM.md](docs/BUG-GMEM.md).
-
-## Repository layout
+## Layout
 
 ```
-.github/            CI: build on push, publish on tag, issue template
-docs/               hardware telemetry, design notes, build & validation reports
-patches/            the only two Mesa patches this build applies
-scripts/            reproducible Linux/CI build + AdrenoTools packaging
-tools/probe/        on-device telemetry and functional test sources
-tools/win/          helper for Windows hosts where ninja cannot spawn children
-versions.env        pinned Mesa / NDK / glslang versions
+.github/     CI: build, hardware gate, manual release
+docs/        telemetry, design, build, validation, benchmarks, bug reports
+patches/     Mesa patches (2 applied, 1 optional sysmem workaround)
+scripts/     build, packaging, probe build, device gate
+tools/probe/ KGSL/Vulkan probe, functional test, benchmark sources
+versions.env pinned Mesa / NDK / glslang versions
 ```
 
-More detail, including what is deliberately *not* committed:
-[docs/REPO_STRUCTURE.md](docs/REPO_STRUCTURE.md).
+## License
 
-## FAQ
-
-**Is this faster than stock Turnip?**
-Variant B targets the exact CPU features of these Kryo cores, which helps
-driver-side (CPU) work; Variant A is byte-for-byte standard `armv8-a` codegen.
-Neither changes GPU behaviour, because the hardware descriptor already matches
-the silicon. No inflated benchmark claims here — measure on your titles.
-
-**Why not enable LTO?**
-Mesa 26.3 refuses it outright: `Building Mesa with LTO is not supported.` This
-is upstream policy, not a missing flag. See [docs/DRIVER_DESIGN.md](docs/DRIVER_DESIGN.md) §3.4.
-
-**Why does `TU_DEBUG=startup` show Adreno 735 sometimes?**
-If you run an unpatched upstream build, that is expected — it matches through
-the A735 wildcard. This repo's package reports `Adreno (TM) 22`.
-
-**Can I use this on an Adreno 740/750 device?**
-Don't. The package is built and tuned for one chip family; use a build made for
-yours.
-
-**Does it need root?**
-No. AdrenoTools loads the HAL inside the app process.
-
-## Contributing
-
-Bug reports are welcome — please use the issue template and include device,
-driver variant, app/title, and `adb logcat -b crash -d` output. Driver bugs that
-are not specific to this packaging belong upstream at
-[Mesa's freedreno issue tracker](https://gitlab.freedesktop.org/mesa/mesa/-/issues);
-this project keeps its two patches local and does not submit them upstream.
-
-## License & trademarks
-
-Project code and packaging: MIT — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
-Driver binaries are Mesa 3D builds (MIT). Qualcomm, Snapdragon, Adreno and
-AdrenoTools are trademarks of their respective owners; this project is not
-affiliated with or endorsed by Qualcomm or Mesa.
+Project code: MIT ([`LICENSE`](LICENSE), [`NOTICE`](NOTICE)). Driver binaries are
+Mesa 3D builds (MIT). Qualcomm, Snapdragon and Adreno are trademarks of Qualcomm
+Incorporated; this project is not affiliated with or endorsed by Qualcomm or
+Mesa.

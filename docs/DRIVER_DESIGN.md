@@ -71,7 +71,7 @@ This is a no-op for Linux/CI builds and makes Windows-host builds correct.
 
 ### 3.3 Compiler / toolchain configuration
 
-Both variants:
+Build configuration:
 
 * NDK r28c clang 19.0.1, `--target=aarch64-linux-android35`, API 35
   (matches the device's SDK level exactly).
@@ -84,7 +84,7 @@ Both variants:
   `libsync`). No `libc++_shared.so` to bundle or to collide with the host app.
 * `-fno-emulated-tls` (Mesa's Android default) so TLS uses ELF TLS.
 
-Variant B adds:
+ISA-specific flags:
 
 * `-march=armv8.6-a+crypto+crc+dotprod+fp16+i8mm+bf16`
   chosen from the device's actual `/proc/cpuinfo` feature list.
@@ -147,7 +147,7 @@ cost model over draw-call bandwidth.
 
 ## 5. ISA tuning: why `armv9-a` crashed and `armv8.6-a` works
 
-The first Variant B attempt used `-march=armv9-a+…`. The driver died with
+The first build attempt used `-march=armv9-a+…`. The driver died with
 `SIGILL` in `blake3_hasher_update` while enumerating devices.
 
 Reason: LLVM's `armv9-a` baseline implies SVE/SVE2, and these Kryo cores
@@ -156,11 +156,8 @@ implement SVE — `/proc/cpuinfo` lists no `sve`. Clang therefore emitted SVE
 instructions that the CPU cannot decode.
 
 Fix: target the exact architectural feature set the cores advertise —
-`armv8.6-a+crypto+crc+dotprod+fp16+i8mm+bf16`. Variant B then passed the same
-functional tests as Variant A.
-
-This is also why Variant A exists: a generic `armv8-a` build is the safe choice
-for users who are not certain which bin/SoC variant they have.
+`armv8.6-a+crypto+crc+dotprod+fp16+i8mm+bf16`. The rebuilt driver then passed the same
+functional tests.
 
 ## 6. Known limitations / future work
 

@@ -1,18 +1,16 @@
-﻿#!/usr/bin/env python3
-"""Strip + package a Turnip build as an AdrenoTools (.adpkg) zip.
+#!/usr/bin/env python3
+"""Strip and package a Turnip build as an AdrenoTools (.adpkg) archive.
 
-Outputs (all deterministic â€” same input bytes produce the same SHA256):
-    dist/turnip-a22-<ver>-variant<X>.adpkg.zip        meta.json + stripped .so
-    dist/turnip-a22-<ver>-variant<X>.debug.zip        unsigned debug symbols
-
-The debug archive is a separate release asset: AdrenoTools only understands
-meta.json + the driver .so, so symbols stay out of the driver package.
+Outputs (deterministic: identical input bytes produce identical SHA256):
+    dist/turnip-a22-<ver>.adpkg.zip    meta.json + stripped .so
+    dist/turnip-a22-<ver>.debug.zip    separate debug symbols
+    dist/SHA256SUMS.txt                hashes of both archives
 
 Usage:
     python scripts/package_driver.py --so <libvulkan_freedreno.so> \
-        --variant A --version 26.3.0 --out dist/ \
-        --strip-tool $NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip \
-        --objcopy-tool $NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-objcopy
+        --version 26.3.0 --out dist/ \
+        --strip-tool $NDK/.../bin/llvm-strip \
+        --objcopy-tool $NDK/.../bin/llvm-objcopy
 
 Schema: https://github.com/bylaws/libadrenotools/blob/master/tools/ADPKG.md
 """
@@ -24,31 +22,16 @@ import shutil
 import subprocess
 import zipfile
 
-VARIANTS = {
-    "A": {
-        "name": "Turnip A22 Balanced (Snapdragon G2 Gen 2)",
-        "description": (
-            "Mesa 26.3.0 Turnip for the Qualcomm Snapdragon G2 Gen 2 (SG6275P) "
-            "Adreno A22 / gen7-11-0 GPU. Stable -O3 release build, generic "
-            "ARMv8-A ISA, self-contained libc++, A22 device identity. "
-            "Recommended default for emulators and Winlator."
-        ),
-        "packageVersion": "2",
-    },
-    "B": {
-        "name": "Turnip A22 Performance (Snapdragon G2 Gen 2)",
-        "description": (
-            "Mesa 26.3.0 Turnip for the Qualcomm Snapdragon G2 Gen 2 (SG6275P) "
-            "Adreno A22 / gen7-11-0 GPU. Performance variant: ARMv8.6-A ISA "
-            "codegen (dotprod/fp16/i8mm/bf16/crypto), -fno-semantic-interposition, "
-            "fully stripped. Same validated driver as Balanced."
-        ),
-        "packageVersion": "2",
-    },
-}
+PACKAGE_NAME = "Turnip A22 (Snapdragon G2 Gen 2)"
+PACKAGE_DESCRIPTION = (
+    "Mesa 26.3.0 freedreno Vulkan HAL for the Qualcomm Snapdragon G2 Gen 2 "
+    "(SG6275P), Adreno (TM) 22 / gen7-11-0 (chip_id 0x43030b00). Release "
+    "build: -O3, ARMv8.6-A ISA, static libc++, stripped."
+)
+PACKAGE_VERSION = "3"
 
-# 1980-01-01 is the earliest timestamp a zip can represent; using a constant
-# makes the archive byte-for-byte reproducible.
+# 1980-01-01 is the earliest timestamp a zip can represent; a constant makes the
+# archive byte-for-byte reproducible.
 FIXED_DATE_TIME = (1980, 1, 1, 0, 0, 0)
 
 
@@ -76,7 +59,6 @@ def write_deterministic_zip(zip_path, entries):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--so", required=True)
-    ap.add_argument("--variant", choices=sorted(VARIANTS), required=True)
     ap.add_argument("--version", default="26.3.0")
     ap.add_argument("--author", default="A22 Turnip Build")
     ap.add_argument("--strip-tool", default=None)
@@ -87,8 +69,7 @@ def main():
     args = ap.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
-    meta_variant = VARIANTS[args.variant]
-    stage = os.path.join(args.out, f"stage-{args.variant}")
+    stage = os.path.join(args.out, "stage")
     shutil.rmtree(stage, ignore_errors=True)
     os.makedirs(stage)
 
@@ -109,12 +90,12 @@ def main():
 
     meta = {
         "schemaVersion": 1,
-        "name": meta_variant["name"],
-        "description": meta_variant["description"],
+        "name": PACKAGE_NAME,
+        "description": PACKAGE_DESCRIPTION,
         "author": args.author,
-        "packageVersion": meta_variant["packageVersion"],
+        "packageVersion": PACKAGE_VERSION,
         "vendor": "Mesa",
-        "driverVersion": f"{args.version}-a22{args.variant.lower()}",
+        "driverVersion": args.version,
         "minApi": 28,
         "libraryName": so_name,
     }
@@ -123,29 +104,29 @@ def main():
         json.dump(meta, f, indent=2)
         f.write("\n")
 
-    zip_name = f"turnip-a22-{args.version}-variant{args.variant}.adpkg.zip"
+    zip_name = f"turnip-a22-{args.version}.adpkg.zip"
     zip_path = os.path.join(args.out, zip_name)
     write_deterministic_zip(zip_path, [(so_name, so_dst), ("meta.json", meta_path)])
 
-    print(f"variant {args.variant}: {zip_path}")
+    print(f"package: {zip_path}")
     print(f"  library  {os.path.getsize(so_dst)/1e6:.2f} MB (stripped)")
     print(f"  archive  {os.path.getsize(zip_path)/1e6:.2f} MB")
     print(f"  sha256   {sha256(zip_path)}")
 
+    dbg_zip = None
     if debug_path:
-        dbg_zip = os.path.join(args.out, f"turnip-a22-{args.version}-variant{args.variant}.debug.zip")
+        dbg_zip = os.path.join(args.out, f"turnip-a22-{args.version}.debug.zip")
         write_deterministic_zip(dbg_zip, [(so_name + ".debug", debug_path)])
         print(f"  symbols  {os.path.getsize(debug_path)/1e6:.2f} MB "
               f"-> {os.path.basename(dbg_zip)} ({os.path.getsize(dbg_zip)/1e6:.2f} MB)")
 
-    sums = os.path.join(args.out, f"SHA256SUMS-{args.variant}.txt")
+    sums = os.path.join(args.out, "SHA256SUMS.txt")
     with open(sums, "w", encoding="utf-8", newline="\n") as f:
         f.write(f"{sha256(zip_path)}  {zip_name}\n")
-        if debug_path:
+        if dbg_zip:
             f.write(f"{sha256(dbg_zip)}  {os.path.basename(dbg_zip)}\n")
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -10,7 +10,7 @@ Release: <https://github.com/StevenMXZ/Adreno-Tools-Drivers/releases/tag/v39>
 | Mesa | 27.0.0-devel, `git-2648b2059f` (upstream `main`) | 26.3.0 release tarball |
 | Vulkan | 1.4.367 | 1.4.363 |
 | NDK / API | r29 / API 36 | r28c / API 35 |
-| Variants | Gen8, Gen8-patched, v27-R2, v27-R2-OneUI | A (generic ISA), B (ARMv8.6-A) |
+| Packages | Gen8, Gen8-patched, v27-R2, v27-R2-OneUI | single ARMv8.6-A package |
 | Device naming | `Adreno (TM) 735` (A22 has no entry) | `Adreno (TM) 22` (our patch) |
 
 The "patched" variants are aimed at A8xx (Gen8) hardware; the a7xx variant is
