@@ -106,17 +106,30 @@ Guarantees:
 
 Release process and hardware gate: [RELEASING.md](RELEASING.md).
 
-## Windows host notes
+## Windows host (Git Bash, no WSL)
 
-Three environment issues were hit on a Windows host without WSL/Docker; they do
-not affect Linux or CI:
+`build_turnip_g2gen2.sh` detects Git Bash and switches to the NDK's
+`windows-x86_64` prebuilts. One-time setup and per-shell environment:
+[DEV_SETUP.md](DEV_SETUP.md) (`scripts/setup_win_env.sh`,
+`source scripts/win_env.sh`).
 
-1. `win_flex --wincompat` emits `<io.h>`; patch `0002` disables that path for
-   non-Windows targets.
-2. `ninja` could not spawn children under the local sandbox; the build was driven
-   by [`tools/win/mininja.py`](../tools/win/mininja.py). Linux uses plain ninja.
-3. Python 3.14 `tempfile.mkdtemp()` DACLs denied access under the sandbox; a
-   `sitecustomize.py` shim (build environment only) works around it.
+Host-specific issues and how they are handled:
+
+1. `win_flex --wincompat` emits `<io.h>`; patch `0002` makes Mesa look for
+   POSIX `flex`/`bison` when the target is not Windows, and the build script
+   stages WinFlexBison under those names (`tools/winflexbison/`).
+2. meson needs `nm`; the cross file names the NDK's `llvm-nm`.
+3. Mesa's freedreno XML-include lint compares `/`-separated paths, but Python's
+   `glob` returns `\` on Windows, so every file was flagged; patch `0003`
+   normalises the separators (no-op on Linux).
+4. Patches are applied with git's repository discovery fenced off
+   (`GIT_CEILING_DIRECTORIES`) and Windows-style paths; a patch that neither
+   applies nor is already applied now aborts the build instead of being
+   reported as "skipped".
+5. Earlier builds (inside an agent sandbox) needed
+   [`tools/win/mininja.py`](../tools/win/mininja.py) because ninja could not
+   spawn children, and a `sitecustomize.py` shim for Python 3.14 temp-dir
+   DACLs. Neither is needed in a normal Git Bash session with Python 3.12.
 
 ## CI
 

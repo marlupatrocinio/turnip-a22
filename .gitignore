@@ -24,6 +24,9 @@ __pycache__/
 *.py[cod]
 .venv/
 
+# Test results (dEQP runs, captures)
+results/
+
 # Profiling data
 *.profraw
 *.profdata

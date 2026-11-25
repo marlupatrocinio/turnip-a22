@@ -25,20 +25,27 @@ turnip-a22/
 |   |-- REPO_STRUCTURE.md
 |   `-- artifacts/stock-vkjson.json
 |-- patches/
-|   -- optional/0003-force-sysmem-on-adreno-a22.patch
+|   |-- optional/0003-force-sysmem-on-adreno-a22.patch
 |   |-- 0001-freedreno-add-A22-device-id.patch
-|   `-- 0002-meson-allow-posix-flex-when-cross-compiling-for-android.patch
+|   |-- 0002-meson-allow-posix-flex-when-cross-compiling-for-android.patch
+|   `-- 0003-freedreno-normalize-paths-in-xml-include-check.patch
 |-- scripts/
-|   |-- build_turnip_g2gen2.sh   # reproducible Linux/CI build
+|   |-- build_turnip_g2gen2.sh   # driver build (Linux/CI or Windows Git Bash)
 |   |-- package_driver.py        # strip + debug symbols + deterministic zip
-|   |-- build_probes.sh          # build probe/test/benchmark binaries
-|   `-- device_test.sh           # hardware release gate (adb)
+|   |-- build_probes.sh          # build probe/test/benchmark binaries + HAL shim
+|   |-- build_deqp.sh            # dEQP-VK as an Android executable
+|   |-- run_deqp.py              # crash-tolerant dEQP runner + baseline diff
+|   |-- device_test.sh           # hardware release gate (adb)
+|   |-- setup_win_env.sh         # one-time Windows toolchain setup
+|   |-- win_env.sh               # per-shell Windows environment
+|   `-- setup_dev_env.sh         # one-time Linux/WSL toolchain setup
 |-- tools/
 |   |-- probe/
 |   |   |-- a22probe.c           # KGSL ioctls + HAL enumeration
 |   |   |-- a22test.c            # compute + clear/resolve verification
 |   |   |-- a22_compute.comp     # test shader
 |   |   |-- a22bench.c           # render + bandwidth benchmark
+|   |   |-- vkhal_shim.c         # HMI -> vkGetInstanceProcAddr (for dEQP-VK)
 |   |   |-- bench.vert / bench.frag
 |   |   |-- android_hwvulkan.h   # self-contained HAL ABI (NDK-only builds)
 |   |   `-- msm_kgsl.h           # KGSL uapi header (Mesa copy)

@@ -26,13 +26,16 @@ mkdir -p "$OUT"
 
 # SPIR-V headers are generated, not committed. They are needed by a22test
 # (compute shader) and a22bench (vertex/fragment pair).
-if ! command -v glslangValidator >/dev/null; then
-    echo "glslangValidator not found; required to build the test shaders" >&2
+# Recent glslang releases ship only `glslang`; older ones `glslangValidator`.
+[ -d "$HERE/tools/glslang/bin" ] && PATH="$HERE/tools/glslang/bin:$PATH"
+GLSLANG="$(command -v glslangValidator || command -v glslang || true)"
+if [ -z "$GLSLANG" ]; then
+    echo "glslang/glslangValidator not found; required to build the test shaders" >&2
     exit 1
 fi
-glslangValidator -V --vn a22_comp_spv -o "$PROBE/a22_comp_spv.h" "$PROBE/a22_compute.comp" >/dev/null
-glslangValidator -V --vn bench_vert_spv -o "$PROBE/bench_vert_spv.h" "$PROBE/bench.vert" >/dev/null
-glslangValidator -V --vn bench_frag_spv -o "$PROBE/bench_frag_spv.h" "$PROBE/bench.frag" >/dev/null
+"$GLSLANG" -V --vn a22_comp_spv -o "$PROBE/a22_comp_spv.h" "$PROBE/a22_compute.comp" >/dev/null
+"$GLSLANG" -V --vn bench_vert_spv -o "$PROBE/bench_vert_spv.h" "$PROBE/bench.vert" >/dev/null
+"$GLSLANG" -V --vn bench_frag_spv -o "$PROBE/bench_frag_spv.h" "$PROBE/bench.frag" >/dev/null
 
 for tool in a22probe a22test a22bench; do
     "$CC" --target="aarch64-linux-android$API" --sysroot="$SYSROOT" \
@@ -40,3 +43,9 @@ for tool in a22probe a22test a22bench; do
         -o "$OUT/$tool" "$PROBE/$tool.c" -ldl
     echo "built $OUT/$tool"
 done
+
+# HMI -> vkGetInstanceProcAddr adapter for dEQP-VK and other by-path loaders.
+"$CC" --target="aarch64-linux-android$API" --sysroot="$SYSROOT" \
+    -I "$PROBE" -O2 -fPIC -shared -fvisibility=hidden \
+    -o "$OUT/libvkhal_shim.so" "$PROBE/vkhal_shim.c" -ldl
+echo "built $OUT/libvkhal_shim.so"

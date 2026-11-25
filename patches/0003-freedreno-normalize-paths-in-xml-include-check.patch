@@ -1,0 +1,12 @@
+--- a/src/freedreno/tests/check_xml_includes.py
++++ b/src/freedreno/tests/check_xml_includes.py
+@@ -22,6 +22,9 @@
+     + glob.glob("src/gallium/drivers/freedreno/**/*.cc", recursive=True)
+ )
+ 
++# glob returns host separators; the awk rules match "/"-separated paths.
++files = [f.replace(os.sep, "/") for f in files]
++
+ result = subprocess.run(
+     ["awk", "-f", "src/freedreno/tests/check_xml_includes.awk"] + sorted(files)
+ )

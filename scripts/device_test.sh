@@ -16,6 +16,11 @@ SERIAL="${ANDROID_SERIAL:-}"
 [ -f "$ZIP" ] || { echo "no such package: $ZIP" >&2; exit 1; }
 [ -f "$TEST_BIN" ] || { echo "no a22test binary at $TEST_BIN (run scripts/build_probes.sh)" >&2; exit 1; }
 
+# Git Bash/MSYS: stop MSYS rewriting device paths (/data/...) and hand adb.exe
+# Windows paths for local files instead.
+case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) export MSYS_NO_PATHCONV=1
+    localpath() { cygpath -w "$1"; } ;; *) localpath() { printf '%s' "$1"; } ;; esac
+
 adb_cmd() { if [ -n "$SERIAL" ]; then "$ADB" -s "$SERIAL" "$@"; else "$ADB" "$@"; fi; }
 
 echo "== device =="
@@ -31,8 +36,8 @@ grep -q '"libraryName": "libvulkan_freedreno.so"' "$WORK/meta.json" \
     || { echo "meta.json libraryName mismatch" >&2; exit 1; }
 
 echo "== pushing =="
-adb_cmd push "$SO" /data/local/tmp/libvulkan_freedreno_gate.so >/dev/null
-adb_cmd push "$TEST_BIN" /data/local/tmp/a22test_gate >/dev/null
+adb_cmd push "$(localpath "$SO")" /data/local/tmp/libvulkan_freedreno_gate.so >/dev/null
+adb_cmd push "$(localpath "$TEST_BIN")" /data/local/tmp/a22test_gate >/dev/null
 adb_cmd shell chmod 755 /data/local/tmp/a22test_gate
 
 echo "== running functional gate =="

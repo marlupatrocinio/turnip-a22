@@ -85,7 +85,7 @@ Method and raw data: [`docs/VALIDATION.md`](docs/VALIDATION.md),
 #    dist/SHA256SUMS.txt
 ```
 
-Pinned inputs in [`versions.env`](versions.env); two local Mesa patches in
+Pinned inputs in [`versions.env`](versions.env); three local Mesa patches in
 [`patches/`](patches). Toolchain, cross file and host notes:
 [`docs/BUILD.md`](docs/BUILD.md).
 
@@ -115,7 +115,7 @@ misrenders. Details: [`docs/BUG-GMEM.md`](docs/BUG-GMEM.md).
 ```
 .github/     CI: build, hardware gate, manual release
 docs/        telemetry, design, build, validation, benchmarks, bug reports
-patches/     Mesa patches (2 applied, 1 optional sysmem workaround)
+patches/     Mesa patches (3 applied, 1 optional sysmem workaround)
 scripts/     build, packaging, probe build, device gate
 tools/probe/ KGSL/Vulkan probe, functional test, benchmark sources
 versions.env pinned Mesa / NDK / glslang versions
