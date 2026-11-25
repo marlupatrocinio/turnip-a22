@@ -94,6 +94,17 @@ stock 1.3.0 blob). It survives crashing cases, takes debug knobs via `--env` (e.
 `--env TU_DEBUG=gmem`) and diffs against a previous run
 (`--baseline results/<run>/results.csv`).
 
+It also reads KGSL's `reset_count` (`/sys/class/kgsl/kgsl-3d0/reset_count`)
+around every chunk. On this kernel that counter is **not** a hang counter: it
+rises by exactly one per process that submits GPU work, with the stock
+Qualcomm driver and with Turnip alike (measured 2026-11-25). A chunk showing
+more than one is worth a look (a crash restart inside it, or a real hang).
+Real GPU faults show up in the kernel log, which the shell user can read on
+this permissive-SELinux build: `adb shell "dmesg | grep kgsl"`.
+
+dEQP-VK 1.4.7.1 has 3.2 M cases (`pipeline` alone 1.17 M), so runs use
+group filters, not the full tree.
+
 ## Profiling (simpleperf, no root)
 
 The NDK ships simpleperf for the device and for the host. As the shell user it

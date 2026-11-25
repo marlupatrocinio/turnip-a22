@@ -35,6 +35,7 @@ turnip-a22/
 |   |-- build_probes.sh          # build probe/test/benchmark binaries + HAL shim
 |   |-- build_deqp.sh            # dEQP-VK as an Android executable
 |   |-- run_deqp.py              # crash-tolerant dEQP runner + baseline diff
+|   |-- gmem_repro.sh            # a22gmem sweep: sysmem vs gmem vs autotune
 |   |-- device_test.sh           # hardware release gate (adb)
 |   |-- setup_win_env.sh         # one-time Windows toolchain setup
 |   |-- win_env.sh               # per-shell Windows environment
@@ -46,6 +47,8 @@ turnip-a22/
 |   |   |-- a22_compute.comp     # test shader
 |   |   |-- a22bench.c           # render + bandwidth benchmark
 |   |   |-- vkhal_shim.c         # HMI -> vkGetInstanceProcAddr (for dEQP-VK)
+|   |   |-- a22gmem.c            # GMEM vs SYSMEM deferred-shading reproducer
+|   |   |-- gmem.vert / gmem_geom.frag / gmem_light.frag / gmem_light_tex.frag
 |   |   |-- bench.vert / bench.frag
 |   |   |-- android_hwvulkan.h   # self-contained HAL ABI (NDK-only builds)
 |   |   `-- msm_kgsl.h           # KGSL uapi header (Mesa copy)

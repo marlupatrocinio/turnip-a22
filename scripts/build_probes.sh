@@ -36,8 +36,12 @@ fi
 "$GLSLANG" -V --vn a22_comp_spv -o "$PROBE/a22_comp_spv.h" "$PROBE/a22_compute.comp" >/dev/null
 "$GLSLANG" -V --vn bench_vert_spv -o "$PROBE/bench_vert_spv.h" "$PROBE/bench.vert" >/dev/null
 "$GLSLANG" -V --vn bench_frag_spv -o "$PROBE/bench_frag_spv.h" "$PROBE/bench.frag" >/dev/null
+"$GLSLANG" -V --vn gmem_vert_spv -o "$PROBE/gmem_vert_spv.h" "$PROBE/gmem.vert" >/dev/null
+"$GLSLANG" -V --vn gmem_geom_frag_spv -o "$PROBE/gmem_geom_frag_spv.h" "$PROBE/gmem_geom.frag" >/dev/null
+"$GLSLANG" -V --vn gmem_light_frag_spv -o "$PROBE/gmem_light_frag_spv.h" "$PROBE/gmem_light.frag" >/dev/null
+"$GLSLANG" -V --vn gmem_light_tex_frag_spv -o "$PROBE/gmem_light_tex_frag_spv.h" "$PROBE/gmem_light_tex.frag" >/dev/null
 
-for tool in a22probe a22test a22bench; do
+for tool in a22probe a22test a22bench a22gmem; do
     "$CC" --target="aarch64-linux-android$API" --sysroot="$SYSROOT" \
         -I "$PROBE" -O2 -fPIE -pie \
         -o "$OUT/$tool" "$PROBE/$tool.c" -ldl

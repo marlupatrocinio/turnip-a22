@@ -106,9 +106,34 @@ Result on `turnip-a22-26.3.0.adpkg.zip`:
 | image clear + resolve | PASS (262144/262144) |
 | submit round-trip | 0.240 ms |
 
-## 8. Not covered
+## 8. Vulkan CTS baseline (dEQP-VK 1.4.7.1)
 
-* Vulkan CTS (`dEQP`); known weak cases for this GPU class are `compute_nbody`
-  and `pipeline_barriers`.
+Driver: `turnip-a22-26.3.0.adpkg.zip` (a22.3, `f308afd4…`), default
+autotuner, no `TU_DEBUG`. Run with `scripts/run_deqp.py` on 2026-11-25.
+
+| Group | Pass | NotSupported | Fail | Crash | Time |
+|---|---|---|---|---|---|
+| `dEQP-VK.api.smoke.*` | 8 | 0 | 0 | 0 | <1 s |
+| `dEQP-VK.renderpasses.*` | 53,450 | 28,215 | **22** | 0 | 1242 s |
+
+All 22 failures are one pattern, in every render-pass flavour
+(renderpass2, dynamic rendering primary / partial / complete secondary):
+
+```
+...fragment_density_map.{1,2,4,6}_view(s).{render,render_copy}.density_formula.1_sample.static_subsampled_4_4
+```
+
+No GPU faults, hangs or snapshots in the kernel log during the run. The only
+KGSL message is the rejected `RB_CCU_CNTL` write, see
+[BUG-CCU-CNTL.md](BUG-CCU-CNTL.md). (`reset_count` rose 310 → 652; on this
+kernel it counts GPU contexts used, stock driver included, not hangs.)
+
+This is the reference for every later change: compare with
+`run_deqp.py --baseline results/base-renderpasses/results.csv`.
+
+## 9. Not covered
+
+* The rest of dEQP-VK (3.2 M cases; `pipeline` alone is 1.17 M); known weak
+  cases for this GPU class are `compute_nbody` and `pipeline_barriers`.
 * Long thermal soaks; field runs reached 84–87 °C GPU.
 * DXVK/VKD3D workloads; the No Man's Sky field test uses native Vulkan.

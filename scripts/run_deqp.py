@@ -66,6 +66,15 @@ def push_deqp(deqp_out, force):
     adb("shell", f"chmod 755 {DEV_DIR}/deqp-vk")
 
 
+def gpu_resets():
+    """KGSL's cumulative GPU reset (hang recovery) counter, or None."""
+    r = adb("shell", "cat /sys/class/kgsl/kgsl-3d0/reset_count", check=False)
+    try:
+        return int(r.stdout.strip())
+    except ValueError:
+        return None
+
+
 def env_prefix(envs):
     return " ".join(f"{e}" for e in envs)
 
@@ -153,20 +162,30 @@ def main():
     print(f"{len(cases)} cases, env: {' '.join(a.env) or '(none)'}")
 
     results = {}
+    resets = []  # (delta, first case, last case, n cases) per chunk that reset the GPU
+    reset_start = gpu_resets()
     t0 = time.time()
     with open(os.path.join(a.out, "raw.log"), "w") as raw:
         pending = list(cases)
         while pending:
             chunk = pending[:a.chunk]
+            r0 = gpu_resets()
             got = run_chunk(a.env, chunk, a.timeout, raw)
+            r1 = gpu_resets()
             results.update(got)
             if not got:  # nothing ran at all: mark first as crash to make progress
                 results[chunk[0]] = ("Crash", "no output")
             done_upto = max(chunk.index(c) for c in got) + 1 if got else 1
+            if r0 is not None and r1 is not None and r1 > r0:
+                ran = chunk[:done_upto]
+                resets.append((r1 - r0, ran[0], ran[-1], len(ran)))
+                raw.write(f"\n### GPU RESET x{r1 - r0} during {ran[0]} .. {ran[-1]}\n")
             pending = chunk[done_upto:] + pending[a.chunk:]
             n = len(results)
             fails = sum(1 for s, _ in results.values() if s in FAILING)
-            print(f"  {n}/{len(cases)}  failing={fails}  {time.time()-t0:.0f}s", flush=True)
+            nres = sum(d for d, *_ in resets)
+            print(f"  {n}/{len(cases)}  failing={fails}  gpu_resets={nres}  "
+                  f"{time.time()-t0:.0f}s", flush=True)
 
     for c in cases:
         results.setdefault(c, ("Missing", "not reported"))
@@ -178,10 +197,17 @@ def main():
     counts = {}
     for s, _ in results.values():
         counts[s] = counts.get(s, 0) + 1
+    reset_end = gpu_resets()
     lines = [f"driver: {a.driver}", f"filter: {a.filter}", f"env: {' '.join(a.env)}",
-             f"time: {time.time()-t0:.0f}s", ""] + \
+             f"time: {time.time()-t0:.0f}s",
+             f"kgsl reset_count: {reset_start} -> {reset_end} "
+             f"(+1 per GPU-submitting process on stock and Turnip alike)", ""] + \
             [f"{k:22s} {v}" for k, v in sorted(counts.items())] + [""] + \
             [f"{s:14s} {c}" for c in cases for s in [results[c][0]] if s in FAILING]
+    if resets:
+        lines += ["", "reset_count increments per chunk (expected 1 per process; "
+                      "more than 1 per chunk = a crash restart or a real hang):"]
+        lines += [f"  x{d}  {n:4d} cases  {first} .. {last}" for d, first, last, n in resets]
 
     if a.baseline:
         base = {}
