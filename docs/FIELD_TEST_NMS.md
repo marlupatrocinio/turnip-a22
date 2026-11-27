@@ -71,3 +71,33 @@ adb shell dumpsys SurfaceFlinger --latency '<layer>'
 
 Parse presentation timestamps into frame intervals; report p50/p95 and the share
 of frames above 1.5x p50, always alongside `clock_mhz` and `gpu_busy_percentage`.
+
+## 2026-11-27: release vs Mesa 27-devel vs prefer_sysmem (GameNative, Proton 11)
+
+Same spot, 1280×720, low settings, 45 s captures with
+[`scripts/frametimes.py`](../scripts/frametimes.py) on GameNative's
+`gndrm-scanout` layer. Driver identity from the kernel log: the release
+raises AHB errors on the GMEM path, the Mesa 27 build (with patch 0004) none.
+
+| Run | Wrapper | Driver | avg FPS | p50 | p95 | p99 | GPU busy | temp |
+|---|---|---|---|---|---|---|---|---|
+| A | v1 | release a22.3 | 15.71 (first run after load) | 66.67 | 66.67 | 216.7 | 98.2 % | 86.9 °C |
+| C | v1 | Mesa 27-devel 79d58f09 + 0001-0004 | 19.75 | 50.0 | 66.67 | 83.3 | 96.0 % | 78.0 °C |
+| A2 | v1 | release a22.3 | 21.73 | 50.0 | 66.67 | 83.3 | 95.1 % | 85.3 °C |
+| W2-1 | v2 | release a22.3 | 19.10 | 50.0 | 66.67 | 83.3 | 98.5 % | 83.9 °C |
+| W2-2 | v2 | Mesa 27-devel | 19.13 | 50.0 | 83.33 | 83.3 | 96.2 % | 85.4 °C |
+| B' | v1 | Mesa 27-devel + `prefer_sysmem` | **10.26** | 100.0 | 116.7 | 166.7 | 97.9 % | 80.3 °C |
+
+All at 949-950 MHz. Findings:
+
+* **Mesa 27-devel = 26.3 release in this GPU-bound scene** (19.75 vs 21.73,
+  19.13 vs 19.10). Mesa 27's measured gains are CPU-side (`a22cpu` submit
+  ~22 % cheaper) and Vulkan 1.4.368, not GPU throughput here.
+* **Wrapper v2 vs v1: no measurable difference.**
+* **`prefer_sysmem` roughly halves the frame rate** (single run, far outside
+  the noise): the autotuner's GMEM passes are the biggest performance factor
+  in GPU-bound titles. Policies that send passes to sysmem up front are a
+  loss here.
+* Method: the first capture after loading is unreliable (shader compile,
+  streaming, day/night/weather); warm up ~1 min and interleave drivers.
+  Identical release runs spanned 15.7-21.7 FPS.

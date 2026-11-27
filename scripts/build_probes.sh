@@ -12,7 +12,9 @@ PROBE="$HERE/tools/probe"
 case "$(uname -s)" in
     Linux*)  HOST_TAG=linux-x86_64 ;;
     Darwin*) HOST_TAG=darwin-x86_64 ;;
-    MINGW*|MSYS*|CYGWIN*) HOST_TAG=windows-x86_64 ;;
+    # win_env.sh sets MSYS_NO_PATHCONV for adb; this script needs MSYS to
+    # convert paths for the native Windows clang/glslang.
+    MINGW*|MSYS*|CYGWIN*) HOST_TAG=windows-x86_64; unset MSYS_NO_PATHCONV ;;
     *) echo "unsupported host: $(uname -s)" >&2; exit 1 ;;
 esac
 
@@ -40,8 +42,10 @@ fi
 "$GLSLANG" -V --vn gmem_geom_frag_spv -o "$PROBE/gmem_geom_frag_spv.h" "$PROBE/gmem_geom.frag" >/dev/null
 "$GLSLANG" -V --vn gmem_light_frag_spv -o "$PROBE/gmem_light_frag_spv.h" "$PROBE/gmem_light.frag" >/dev/null
 "$GLSLANG" -V --vn gmem_light_tex_frag_spv -o "$PROBE/gmem_light_tex_frag_spv.h" "$PROBE/gmem_light_tex.frag" >/dev/null
+"$GLSLANG" -V --vn cpu_vert_spv -o "$PROBE/cpu_vert_spv.h" "$PROBE/cpu.vert" >/dev/null
+"$GLSLANG" -V --vn cpu_frag_spv -o "$PROBE/cpu_frag_spv.h" "$PROBE/cpu.frag" >/dev/null
 
-for tool in a22probe a22test a22bench a22gmem; do
+for tool in a22probe a22test a22bench a22gmem a22cpu; do
     "$CC" --target="aarch64-linux-android$API" --sysroot="$SYSROOT" \
         -I "$PROBE" -O2 -fPIE -pie \
         -o "$OUT/$tool" "$PROBE/$tool.c" -ldl

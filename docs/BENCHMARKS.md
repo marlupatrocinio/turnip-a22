@@ -88,6 +88,35 @@ Interpretation:
 * Front-end-side: pre-warm pipeline caches per title, as some Winlator builds
   already do.
 
+## Driver CPU overhead (`a22cpu`, 2026-11-26)
+
+[`tools/probe/a22cpu.c`](../tools/probe/a22cpu.c) measures only driver CPU
+work, pinned to the Cortex-X4 (cpu7, 2.80 GHz), median of 9 runs after a
+warm-up: per-draw recording (pipeline switch every 8 draws, descriptor set
+with dynamic offset, push constants, viewport/scissor every 4 draws, vertex
+buffer, draw), render pass begin+end with one draw, template descriptor
+update, and the CPU side of `vkQueueSubmit`.
+
+Two interleaved rounds per build (the spread between rounds of the same
+build is 2-4 %, so smaller differences are noise):
+
+| Build | record ns/draw | rp ns/pass | update ns | submit µs |
+|---|---|---|---|---|
+| a22.3 release | 168.9 / 165.5 | 1348 / 1250 | 12.4 / 12.4 | 4.1 / 5.7 |
+| + patch 0004 | 168.2 / 168.8 | 1399 / 1296 | 12.4 / 12.4 | 4.2 / 5.6 |
+| + 0004 + `-mtune=cortex-x4` | 166.0 / 164.7 | 1263 / 1294 | 12.3 / 12.2 | 5.7 / 5.7 |
+
+* `-mtune=cortex-x4` (tuning only, ISA unchanged - never `-mcpu=cortex-x4`,
+  which implies SVE) is ~1-2 % faster at recording: inside the noise.
+* Patch 0004 has no CPU effect.
+* Scale: ~165 ns per draw and ~1.3 µs per render pass. BOTW's trace window
+  had ~9,000 draws and ~1,400 passes per second, i.e. roughly 3-4 ms of
+  driver recording CPU per second - a small share of a frame. Most of
+  BOTW's frame time is Eden's own emulation, not Turnip.
+
+`a22cpu` is the benchmark for any further driver-CPU change (flags, LTO,
+PGO, code changes).
+
 ## What this says (and does not)
 
 * Render-mode choice is **within noise** for this fill-bound workload on a

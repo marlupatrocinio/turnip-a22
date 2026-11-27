@@ -66,6 +66,10 @@ def main():
     ap.add_argument("--out", default="dist")
     ap.add_argument("--no-strip", action="store_true")
     ap.add_argument("--no-debug", action="store_true")
+    ap.add_argument("--name", default=PACKAGE_NAME, help="meta.json name")
+    ap.add_argument("--description", default=PACKAGE_DESCRIPTION)
+    ap.add_argument("--zip-prefix", default="turnip-a22",
+                    help="archive name prefix (diagnostic builds use their own)")
     args = ap.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
@@ -90,8 +94,8 @@ def main():
 
     meta = {
         "schemaVersion": 1,
-        "name": PACKAGE_NAME,
-        "description": PACKAGE_DESCRIPTION,
+        "name": args.name,
+        "description": args.description,
         "author": args.author,
         "packageVersion": PACKAGE_VERSION,
         "vendor": "Mesa",
@@ -104,7 +108,7 @@ def main():
         json.dump(meta, f, indent=2)
         f.write("\n")
 
-    zip_name = f"turnip-a22-{args.version}.adpkg.zip"
+    zip_name = f"{args.zip_prefix}-{args.version}.adpkg.zip"
     zip_path = os.path.join(args.out, zip_name)
     write_deterministic_zip(zip_path, [(so_name, so_dst), ("meta.json", meta_path)])
 
@@ -115,7 +119,7 @@ def main():
 
     dbg_zip = None
     if debug_path:
-        dbg_zip = os.path.join(args.out, f"turnip-a22-{args.version}.debug.zip")
+        dbg_zip = os.path.join(args.out, f"{args.zip_prefix}-{args.version}.debug.zip")
         write_deterministic_zip(dbg_zip, [(so_name + ".debug", debug_path)])
         print(f"  symbols  {os.path.getsize(debug_path)/1e6:.2f} MB "
               f"-> {os.path.basename(dbg_zip)} ({os.path.getsize(dbg_zip)/1e6:.2f} MB)")

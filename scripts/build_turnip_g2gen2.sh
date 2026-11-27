@@ -32,7 +32,7 @@ NDK="${NDK:-$HERE/src/android-ndk-$NDK_VERSION}"
 API="${API:-35}"
 JOBS="${JOBS:-$(nproc)}"
 WORK="${WORK:-$HERE/build}"
-DIST="$HERE/dist"
+DIST="${DIST:-$HERE/dist}"
 
 log() { printf '\033[1;32m==>\033[0m %s\n' "$*"; }
 die() { printf '\033[1;31m!!!\033[0m %s\n' "$*" >&2; exit 1; }
@@ -123,7 +123,11 @@ log "applying Turnip A22 patches"
 # of the turnip-a22 repository. A patch that neither applies nor is already
 # applied is fatal - a silently unpatched build is not an A22 build.
 mesa_git() { (cd "$MESA_SRC" && GIT_CEILING_DIRECTORIES="$(dirname "$MESA_SRC")" git "$@"); }
-for p in "$HERE"/patches/*.patch; do
+# EXTRA_PATCHES: an extra patch directory (e.g. patches/diag) for diagnostic
+# builds; never set it for a release, and give such builds their own MESA_SRC.
+EXTRA=()
+[ -n "${EXTRA_PATCHES:-}" ] && EXTRA=("$EXTRA_PATCHES"/*.patch)
+for p in "$HERE"/patches/*.patch "${EXTRA[@]}"; do
     pw="$(winpath "$p")"
     if mesa_git apply --check "$pw" 2>/dev/null; then
         mesa_git apply "$pw"
@@ -137,6 +141,11 @@ for p in "$HERE"/patches/*.patch; do
 done
 
 # ------------------------------------------------------------- cross file
+# EXTRA_CFLAGS: space-separated extra compiler flags for experiments
+# (e.g. "-mtune=cortex-x4"); never use -mcpu=cortex-x4 / armv9 (implies SVE,
+# which these cores lack -> SIGILL).
+EXTRA_ARGS=""
+for f in ${EXTRA_CFLAGS:-}; do EXTRA_ARGS="$EXTRA_ARGS, '$f'"; done
 CROSS="$WORK/cross-a22.txt"
 cat > "$CROSS" <<EOF
 [binaries]
@@ -158,8 +167,8 @@ endian = 'little'
 needs_exe_wrapper = true
 
 [built-in options]
-c_args = ['-DANDROID', '-D__ANDROID_API__=$API', '-fPIC', '-march=armv8.6-a+crypto+crc+dotprod+fp16+i8mm+bf16', '-fomit-frame-pointer', '-fno-semantic-interposition']
-cpp_args = ['-DANDROID', '-D__ANDROID_API__=$API', '-fPIC', '-march=armv8.6-a+crypto+crc+dotprod+fp16+i8mm+bf16', '-fomit-frame-pointer', '-fno-semantic-interposition']
+c_args = ['-DANDROID', '-D__ANDROID_API__=$API', '-fPIC', '-march=armv8.6-a+crypto+crc+dotprod+fp16+i8mm+bf16', '-fomit-frame-pointer', '-fno-semantic-interposition'$EXTRA_ARGS]
+cpp_args = ['-DANDROID', '-D__ANDROID_API__=$API', '-fPIC', '-march=armv8.6-a+crypto+crc+dotprod+fp16+i8mm+bf16', '-fomit-frame-pointer', '-fno-semantic-interposition'$EXTRA_ARGS]
 c_link_args = ['-fuse-ld=lld']
 cpp_link_args = ['-fuse-ld=lld', '-static-libstdc++']
 c_std = 'c11'
@@ -187,9 +196,14 @@ SO="$BDIR/src/freedreno/vulkan/libvulkan_freedreno.so"
 
 log "packaging"
 if [ "$HOST" = windows ]; then PY=python; else PY=python3; fi
+PKG_ARGS=()
+[ -n "${PKG_NAME:-}" ] && PKG_ARGS+=(--name "$PKG_NAME")
+[ -n "${PKG_PREFIX:-}" ] && PKG_ARGS+=(--zip-prefix "$PKG_PREFIX")
+[ -n "${PKG_DESCRIPTION:-}" ] && PKG_ARGS+=(--description "$PKG_DESCRIPTION")
 "$PY" "$(winpath "$HERE/scripts/package_driver.py")" --so "$(winpath "$SO")" \
     --version "$MESA_VERSION" --strip-tool "$TOOLCHAIN/llvm-strip$EXE" \
-    --objcopy-tool "$TOOLCHAIN/llvm-objcopy$EXE" --out "$(winpath "$DIST")"
+    --objcopy-tool "$TOOLCHAIN/llvm-objcopy$EXE" --out "$(winpath "$DIST")" \
+    "${PKG_ARGS[@]}"
 
 log "done - artifacts in $DIST"
 ls -lh "$DIST"/*.zip "$DIST/SHA256SUMS.txt"

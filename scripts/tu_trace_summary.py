@@ -55,6 +55,15 @@ def parse(path):
             elif name in ("start_gmem_clear", "start_sysmem_clear"):
                 kv = dict(KV.findall(rest))
                 cur["clears"].append(kv.get("format", "?"))
+            elif name == "start_draw":
+                kv = dict(KV.findall(rest))
+                cur.setdefault("draws", []).append(
+                    tuple(kv.get(k, "") for k in ("vs_sha1", "tcs_sha1", "tes_sha1",
+                                                   "gs_sha1", "fs_sha1")))
+            elif name.startswith("start_") and name not in (
+                    "start_draw_ib_sysmem", "start_draw_ib_gmem", "start_binning_ib",
+                    "start_concurrent_binning_ib", "start_concurrent_binning_barrier"):
+                cur.setdefault("ops", collections.Counter())[name[6:]] += 1
             elif name == "end_render_pass":
                 cur.update(dict(KV.findall(rest)))
                 passes.append(cur)
@@ -68,6 +77,43 @@ def shape_of(p):
             "S:" + "+".join(sorted(set(p["stores"]))),
             "C:" + "+".join(sorted(set(p["clears"]))))
     return base + fmts
+
+
+def draw_report(passes, groups, top):
+    """Per-draw view (needs TU_GPU_TRACEPOINT=+draw): pipelines by stage set,
+    and what the multi-bin passes contain."""
+    stage_names = ("vs", "tcs", "tes", "gs", "fs")
+    stages_all = collections.Counter()
+    multi = [p for p in passes if int(p.get("numberOfBins", "1") or 1) > 1]
+    print(f"\n== draw level: {sum(len(p.get('draws', [])) for p in passes)} draws in "
+          f"{len(passes)} passes; {len(multi)} multi-bin passes")
+    for p in passes:
+        for d in p.get("draws", []):
+            stages_all["+".join(n for n, s in zip(stage_names, d) if s)] += 1
+    print("stage sets over all draws:", dict(stages_all.most_common()))
+
+    by_shape = collections.OrderedDict()
+    for p in multi:
+        s = shape_of(p)
+        e = by_shape.setdefault(s, {"n": 0, "draws": 0, "stages": collections.Counter(),
+                                    "pipes": collections.Counter(),
+                                    "ops": collections.Counter()})
+        e["n"] += 1
+        for d in p.get("draws", []):
+            e["draws"] += 1
+            e["stages"]["+".join(n for n, x in zip(stage_names, d) if x)] += 1
+            e["pipes"][d] += 1
+        e["ops"].update(p.get("ops", {}))
+    for s, e in sorted(by_shape.items(), key=lambda kv: -kv[1]["draws"])[:top]:
+        w, h, att, smp = s[0], s[1], s[2], s[3]
+        print(f"\n  {w}x{h} att={att} samples={smp} bins={s[9]} ubwc={s[8]}  "
+              f"passes={e['n']} draws={e['draws']} distinct pipelines={len(e['pipes'])}")
+        print(f"    stages: {dict(e['stages'].most_common())}")
+        if e["ops"]:
+            print(f"    in-pass ops: {dict(e['ops'].most_common())}")
+        gs = [d for d in e["pipes"] if d[3]]
+        if gs:
+            print(f"    geometry-shader pipelines: {len(gs)}, e.g. gs={gs[0][3][:16]}")
 
 
 def main():
@@ -103,6 +149,9 @@ def main():
         print(f"{g['n']:6d} {g['tiled']:6d} {g['draws'] / g['n']:8.1f}  "
               f"{w + 'x' + h:>10} {att:>3} {smp:>3} {ccpp:>3}/{lcpp:>2}/{scpp:<2} "
               f"{dep[:1]:>3} {ubwc:<11} {nb:>4}({bw}x{bh})  {L} {S} {C}  [{reasons}]")
+
+    if any("draws" in p for p in passes):
+        draw_report(passes, groups, a.top)
 
     if a.csv:
         with open(a.csv, "w", newline="") as f:

@@ -24,9 +24,11 @@ done
 [ -d "$_here/tools/py/Scripts" ] && PATH="$_here/tools/py/Scripts:$PATH"
 export PATH
 
-# shellcheck disable=SC1091
-. "$_here/versions.env"
-export NDK="${NDK:-$_here/src/android-ndk-${NDK_VERSION:-r28c}}"
+# Read only NDK_VERSION from versions.env: sourcing the whole file here would
+# clobber overrides such as MESA_VERSION passed to the build script.
+_ndkv="$(sed -n 's/^NDK_VERSION=//p' "$_here/versions.env")"
+export NDK="${NDK:-$_here/src/android-ndk-${NDK_VERSION:-${_ndkv:-r28c}}}"
+unset _ndkv
 export MSYS_NO_PATHCONV=1       # keep /data/... adb arguments intact
 export PYTHONUTF8=1
 unset _here _pkgs _d

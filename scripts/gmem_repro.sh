@@ -53,6 +53,7 @@ while read -r fmts depth draws; do
     [ -n "${GM_POST:-}" ] && env="$env GM_POST=$GM_POST"
     [ -n "${GM_MUTABLE:-}" ] && env="$env GM_MUTABLE=$GM_MUTABLE"
     [ -n "${GM_REPEAT:-}" ] && env="$env GM_REPEAT=$GM_REPEAT"
+    [ -n "${GM_INCLEAR:-}" ] && env="$env GM_INCLEAR=$GM_INCLEAR"
     run() { "$ADB" shell -n "cd $DEV && $env TU_DEBUG=$1 ./a22gmem ./lib.so $2 $W $H" | grep -E "FAILED|missing|not a colour|wrote" || true; }
     cmp() { "$ADB" shell -n "cd $DEV && ./a22gmem --compare $1 $2" || true; }
     k0=$(kmsg)

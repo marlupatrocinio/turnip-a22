@@ -46,6 +46,8 @@
  *               (default: x=W/7 y=H/5+3 w=W/2+13 h=H/2+7)
  *   GM_MUTABLE  botw: 1 (default) creates colour images MUTABLE_FORMAT
  *   GM_REPEAT   botw: number of LOAD passes (default 3)
+ *   GM_INCLEAR  botw: color | depth | both - vkCmdClearAttachments of one
+ *               unaligned rectangle halfway through every LOAD pass
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -86,7 +88,7 @@
     X(vkCmdBeginRenderPass) X(vkCmdNextSubpass) X(vkCmdEndRenderPass) \
     X(vkCmdBindPipeline) X(vkCmdBindDescriptorSets) X(vkCmdPushConstants) \
     X(vkCmdSetViewport) X(vkCmdSetScissor) X(vkCmdSetStencilReference) \
-    X(vkCmdDraw) X(vkCmdCopyImageToBuffer) X(vkCmdPipelineBarrier) \
+    X(vkCmdDraw) X(vkCmdCopyImageToBuffer) X(vkCmdPipelineBarrier) X(vkCmdClearAttachments) \
     X(vkCreateSampler) X(vkCreateFence) X(vkQueueSubmit) \
     X(vkWaitForFences) X(vkDeviceWaitIdle)
 
@@ -881,11 +883,38 @@ static void record_botw(VkCommandBuffer cmd, struct frame *fr)
     draw_quads(cmd, pl, 0, fr->draws);
     vkCmdEndRenderPass(cmd);
 
+    /* GM_INCLEAR: vkCmdClearAttachments in the middle of every LOAD pass, one
+     * rectangle that is not bin-aligned (BOTW does this in multi-bin passes) */
+    const char *ic = getenv("GM_INCLEAR");
+    int clear_color = ic && (!strcmp(ic, "color") || !strcmp(ic, "both"));
+    int clear_depth = ic && (!strcmp(ic, "depth") || !strcmp(ic, "both"));
+    int half = (fr->draws / 3 + 1) / 2;
     for (int r = 0; r < repeat; r++) {
+        int first = 10000 + r * 1000;
         begin_rp(cmd, rp_load, fb_load, full, 0, NULL);
         set_area(cmd, fr->W, fr->H, full);
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, p_load);
-        draw_quads(cmd, pl, 10000 + r * 1000, fr->draws / 3 + 1);
+        draw_quads(cmd, pl, first, half);
+        if (clear_color || clear_depth) {
+            VkClearAttachment ca[2];
+            uint32_t n = 0;
+            if (clear_color)
+                ca[n++] = (VkClearAttachment){
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .colorAttachment = 0,
+                    .clearValue.color = { .float32 = { 0.625f, 0.125f + 0.25f * r, 0.75f, 1.0f } } };
+            if (clear_depth)
+                ca[n++] = (VkClearAttachment){
+                    .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT |
+                                  (fr->has_stencil ? VK_IMAGE_ASPECT_STENCIL_BIT : 0),
+                    .clearValue.depthStencil = { 0.5f, 7 } };
+            VkClearRect rect = {
+                .rect = { { (int32_t)(fr->W / 5 + 3 + 17 * r), (int32_t)(fr->H / 7 + 1 + 11 * r) },
+                          { fr->W / 3 + 11, fr->H / 4 + 5 } },
+                .baseArrayLayer = 0, .layerCount = 1,
+            };
+            vkCmdClearAttachments(cmd, n, ca, 1, &rect);
+        }
+        draw_quads(cmd, pl, first + half, fr->draws / 3 + 1 - half);
         vkCmdEndRenderPass(cmd);
     }
     for (uint32_t i = 0; i < fr->ncolor; i++)
