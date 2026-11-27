@@ -1,7 +1,35 @@
-# Known issue: the hardware rejects Turnip's RB_CCU_CNTL write on Adreno A22
+# Fixed: BV thread writes to render-backend registers raise AHB errors
 
-**Status:** confirmed on hardware 2026-11-25; root cause and impact under
-investigation. Leading suspect for [BUG-GMEM.md](BUG-GMEM.md).
+**Status:** root cause found and fixed by
+[`patches/0004-tu-a7xx-RB-static-regs-on-BR-only.patch`](../patches/0004-tu-a7xx-RB-static-regs-on-BR-only.patch)
+(2026-11-26). Not the cause of [BUG-GMEM.md](BUG-GMEM.md).
+
+## Root cause and fix
+
+On A7XX the CP runs two threads, BR (rendering) and BV (binning).
+`tu_emit_bin_preamble()` emits `tu6_init_static_regs()` for **both**, and that
+function writes `RB_CCU_CNTL` and the device's `raw_magic_regs` - including
+render-backend registers (`RB_RBP_CNTL` 0x8e01, `RB_DBG_ECO_CNTL` 0x8e04,
+`RB_CCU_DBG_ECO_CNTL` 0x8e06, `RB_CCU_CNTL` 0x8e07, `RB_UNKNOWN_8E79`). BV
+cannot reach the RB block, so its copies of these writes are rejected (AHB
+bus error); BR's copies succeed, i.e. **the hardware always had the right
+values**. The sibling `emit_rb_ccu_cntl()` call was already skipped for BV.
+The CP reports only the first rejected write, which is why only 0x8e07
+appeared until it was fixed, and then 0x8e01.
+
+Patch 0004 wraps the `RB_CCU_CNTL` write and every magic register in
+0x8e00-0x8eff in `CP_COND_REG_EXEC(THREAD_MODE, BR)`, so BR executes them and
+BV skips them, whichever caller emits them. Mesa `main` (2026-11) still has
+the unguarded code; StevenMXZ's Mesa 27 build happens not to trigger it.
+
+Result (`a22bench` 64×64 × 4000 draws, counting suppressed kernel
+callbacks): **~2,000 AHB error interrupts per run → 0**. `dEQP-VK.renderpasses.*`
+unchanged (53,450 Pass, 22 Fail, 0 new). No measurable CPU or frame-time
+change (`a22cpu`, `a22bench`, interleaved dEQP timing 231/235 s vs 240/231 s).
+A stability fix: the CP no longer faults on every submit, and the kernel no
+longer services hundreds of GPU error interrupts per second in games.
+
+## Original report (2026-11-25)
 
 ## Symptom
 
