@@ -299,15 +299,111 @@ blending, colour write masks, depth bias, in-pass
 `vkCmdClearAttachments` (BOTW issues ~1,500 `sysmem_clear_all` per trace
 window), or reads of an image through a different-format view.
 
-### Next capture: draw level
+### Draw-level capture (default autotuner)
 
-Turnip's per-draw tracepoint is off by default; enable it with
-`TU_GPU_TRACEPOINT=+draw` (Android: `debug.mesa.tu.gpu.tracepoint=+draw`).
-Each draw then logs its vertex/tess/geometry/fragment shader SHA-1s, which
-identifies the pipelines used inside the multi-bin passes (and whether any
-use a geometry shader). Shaders can be dumped by SHA with `IR3_SHADER_DEBUG`
-/ `TU_DEBUG=nir` if a specific pipeline needs to be rebuilt in the
-reproducer.
+`debug.mesa.tu.gpu.tracepoint=+draw` adds per-draw records with every
+stage's shader SHA-1 (`scripts/tu_trace_summary.py` reports them per
+multi-bin shape). 700k-line tail, 20 s at the test spot:
+
+* **186,304 draws, all `vs+fs`** - no geometry or tessellation shaders
+  anywhere;
+* the main 1280×720 7-attachment pass: 724 passes, 123,706 draws,
+  **105 distinct pipelines**; the 8-attachment variant 6 pipelines;
+* **in-pass `vkCmdClearAttachments` inside multi-bin passes**: 1280×720
+  R11G11B10+Z32 (6 bins, colour clear), 1280×720 1-attachment (3 bins,
+  colour), 720×720 depth-only (3 bins, depth), one rect each.
+
+Reproducer `GM_INCLEAR=color|depth|both` (botw mode) clears one unaligned
+rectangle halfway through every LOAD pass; controls: the clear changes
+exactly its rectangle, u_trace shows BOTW's 6-bin 480×384 layout and
+per-bin `gmem_clear`. 16 cases (colour/depth/both × r11g11b10+d32,
+the 6-colour main pass, rgb10a2+d16, r11g11b10+d32s8 at 1280×720; depth and
+both × r8+d16/d32 at 720×720): **all identical**.
+
+### Ruled out so far
+
+Pass configuration (attachments, formats, UBWC state, load/store, depth
+format, bin layout), multi-bin rendering, input attachments, texture
+sampling after a GMEM resolve, unresolve (`LOAD`), partial/unaligned render
+areas and stores, in-pass clears, geometry/tessellation shaders, MSAA (not
+used), LRZ and UBWC toggles (earlier `nolrz`/`noubwc` runs).
+
+### Remaining suspects
+
+What BOTW's 105 main-pass pipelines do per draw: blending, `discard`,
+colour write masks, depth bias, and above all **attachment feedback loops**
+- a shader sampling an image that is also bound as an attachment of the
+same pass. In sysmem that reads memory the pass is writing (roughly
+coherent); in GMEM the attachment lives in tile memory and the sampled copy
+in memory is stale, which would turn lit surfaces into garbage exactly as
+seen. Turnip handles declared loops (`VK_EXT_attachment_feedback_loop_layout`
+sets `disable_gmem`, which even `TU_DEBUG=gmem` honours), but the forced-GMEM
+trace shows every pass tiled with reason `TU_DEBUG(GMEM)`, so no pass was
+declared as a loop.
+
+### Bisect in-game by pass shape (diagnostic driver)
+
+[`patches/diag/0100-tu-gmem-shape-bisect-filter.patch`](../patches/diag/0100-tu-gmem-shape-bisect-filter.patch)
+adds `TU_GMEM_SHAPE` (Android: `debug.mesa.tu.gmem.shape`, read once per
+process) to `use_sysmem_rendering()`: when set, passes whose framebuffer
+matches go GMEM (after the hard constraints), all others go sysmem.
+Syntax: comma-separated `WxHxA` (width, height, framebuffer attachment count
+incl. depth; `*` wildcards) or `multibin` (any pass with more than one bin).
+The u_trace reason shows `TU_GMEM_SHAPE match` / `no match`.
+
+Never released. Built in its own tree and output folder:
+
+```bash
+cp -r src/mesa-26.3.0 src/mesa-26.3.0-diag
+MESA_SRC=$PWD/src/mesa-26.3.0-diag WORK=$PWD/build/diag DIST=$PWD/dist-diag \
+EXTRA_PATCHES=$PWD/patches/diag PKG_PREFIX=turnip-a22-gmembisect \
+PKG_NAME="Turnip A22 GMEM bisect (diagnostic)" bash scripts/build_turnip_g2gen2.sh
+```
+
+Validated with `a22gmem` (1920×1080, 6 attachments): unset → autotuner;
+`1920x1080x6`, `multibin`, `*x*x6`, `1280x720x7,1920x*x*` → GMEM;
+`1280x720x7` → sysmem. Passes the device gate.
+
+Bisect order: `multibin` first (must reproduce the corruption, or the
+filter does not cover the culprit), then the multi-bin shapes from the
+trace - `1280x720x7` (main pass), `1280x720x8`, `1280x720x2`, `1280x720x1`,
+`640x360x7`, `640x360x2`, `640x360x3`, `720x720x1`.
+
+Results (2026-11-25, Eden + BOTW at the test spot, everything else sysmem):
+
+| Step | `debug.mesa.tu.gmem.shape` | Result |
+|---|---|---|
+| 1 | `multibin` | **corrupted** - culprit is a multi-bin pass |
+| 2 | `1280x720x7,1280x720x8` | **corrupted** - one of the main G-buffer passes |
+| 3 | `1280x720x7` | **corrupted** - the 6-colour + D32 main pass alone suffices |
+
+### Feedback-loop detector (diagnostic v2)
+
+The same patch adds `TU_FEEDBACK_CHECK` (`debug.mesa.tu.feedback.check=1`):
+image descriptors written through `vkUpdateDescriptorSets`, update templates
+and push descriptors are recorded per set (offset → image); at every draw
+inside a render pass the bound graphics sets are compared with the pass's
+attachments and each distinct (image, attachment) hit is logged once to
+logcat (`TU_FEEDBACK hit #n: fb WxH att_count A attachment i format F ...`),
+plus running totals. Controls: `a22gmem` subpass mode (input attachments)
+→ exactly its 4 colour attachments flagged; botw mode (no descriptors) → no
+hits.
+
+BOTW: **262,144+ hits, 14 distinct pairs - undeclared feedback loops**:
+
+| Pass | Attachments sampled while bound (VkFormat) |
+|---|---|
+| 1280×720, 8 attachments (main pass variant) | 0 (16 RG8), 1-2 (57 A8B8G8R8_SRGB), 3-4 (51 A8B8G8R8_UNORM), 5 (122 B10G11R11), 6 (100 R32F) |
+| 1280×720, 2 attachments (R11G11B10 + Z32) | 1 (126 D32F - its depth) |
+| 640×360, 7 attachments | 5 (51) |
+| single-bin passes 512², 1024², 256², 64², 160×90 | their colour target |
+
+**No hit in the 1280×720 7-attachment pass** that step 3 isolated. Open
+questions: does `1280x720x8` alone (the pass that samples its own G-buffer)
+also corrupt in GMEM, and does the x7 pass corrupt through its interaction
+with the x8 pass, which renders into and samples the same images? Untested
+gaps in the detector: descriptor copies (`vkCopyDescriptorSets`) and sets
+with more than 64 image descriptors.
 
 ## What we still do not know
 

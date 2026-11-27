@@ -1,0 +1,395 @@
+--- a/src/freedreno/vulkan/tu_cmd_buffer.cc
++++ b/src/freedreno/vulkan/tu_cmd_buffer.cc
+@@ -13,6 +13,7 @@
+ #include "vk_log.h"
+ #include "vk_render_pass.h"
+ #include "vk_util.h"
++#include "util/os_misc.h"
+ 
+ #include "common/freedreno_gpu_event.h"
+ #include "common/freedreno_lrz.h"
+@@ -1415,6 +1416,148 @@
+    return vsc->binning_possible && vsc->binning_useful;
+ }
+ 
++static const char *
++tu_gmem_shape_spec(void)
++{
++   static const char *spec = []() -> const char * {
++      const char *s = os_get_option("TU_GMEM_SHAPE");
++      return (s && *s) ? strdup(s) : NULL;
++   }();
++   return spec;
++}
++
++static bool
++tu_gmem_shape_field(const char *s, size_t n, uint32_t value)
++{
++   if (n == 1 && s[0] == '*')
++      return true;
++   char buf[16];
++   if (n == 0 || n >= sizeof(buf))
++      return false;
++   memcpy(buf, s, n);
++   buf[n] = '\0';
++   return strtoul(buf, NULL, 10) == value;
++}
++
++enum {
++   TU_DIAG_OCCL = 1 << 0,
++   TU_DIAG_PRED = 1 << 1,
++   TU_DIAG_CONDW = 1 << 2,
++   TU_DIAG_IABAR = 1 << 3,
++   TU_DIAG_SPM = 1 << 4,
++   TU_DIAG_SEC = 1 << 5,
++   TU_DIAG_SR = 1 << 6,
++   TU_DIAG_LRZ = 1 << 7,
++};
++
++static const struct { const char *name; uint32_t bit; } tu_diag_flag_names[] = {
++   { "occl", TU_DIAG_OCCL }, { "pred", TU_DIAG_PRED }, { "condw", TU_DIAG_CONDW },
++   { "iabar", TU_DIAG_IABAR }, { "spm", TU_DIAG_SPM }, { "sec", TU_DIAG_SEC },
++   { "sr", TU_DIAG_SR }, { "lrz", TU_DIAG_LRZ },
++};
++
++static bool
++tu_gmem_shape_conds(const char *s, size_t n, uint32_t flags)
++{
++   while (n > 0) {
++      size_t c = 0;
++      while (c < n && s[c] != '/')
++         c++;
++      if (c >= 2 && (s[0] == '+' || s[0] == '!')) {
++         for (unsigned i = 0; i < ARRAY_SIZE(tu_diag_flag_names); i++) {
++            size_t len = strlen(tu_diag_flag_names[i].name);
++            if (c - 1 == len && !strncmp(s + 1, tu_diag_flag_names[i].name, len)) {
++               bool has = flags & tu_diag_flag_names[i].bit;
++               if ((s[0] == '+') != has)
++                  return false;
++            }
++         }
++      }
++      s += c;
++      n -= c;
++      if (n > 0) {
++         s++;
++         n--;
++      }
++   }
++   return true;
++}
++
++static bool
++tu_gmem_shape_match(const char *spec, uint32_t w, uint32_t h, uint32_t att,
++                    uint32_t tiles, uint32_t flags, bool *geometry_match)
++{
++   const char *s = spec;
++   bool any_geom = false;
++   bool full = false;
++   while (*s) {
++      size_t n = strcspn(s, ",;");
++      size_t g = 0;
++      while (g < n && s[g] != '/')
++         g++;
++      bool geom;
++      if (g == 8 && !strncmp(s, "multibin", 8)) {
++         geom = tiles > 1;
++      } else {
++         const uint32_t vals[3] = { w, h, att };
++         const char *f = s;
++         const char *end = s + g;
++         geom = true;
++         for (int i = 0; i < 3 && geom; i++) {
++            const char *x = (const char *)memchr(f, 'x', end - f);
++            size_t fl = (i < 2 && x) ? (size_t)(x - f) : (size_t)(end - f);
++            if (i < 2 && !x)
++               geom = false;
++            else
++               geom = tu_gmem_shape_field(f, fl, vals[i]);
++            f += fl + 1;
++         }
++      }
++      if (geom) {
++         any_geom = true;
++         if (g == n || tu_gmem_shape_conds(s + g + 1, n - g - 1, flags))
++            full = true;
++      }
++      s += n;
++      if (*s)
++         s++;
++   }
++   if (geometry_match)
++      *geometry_match = any_geom;
++   return full;
++}
++
++static void
++tu_gmem_shape_log(uint32_t w, uint32_t h, uint32_t att, uint32_t flags,
++                  uint32_t draws, bool gmem)
++{
++   static struct { uint32_t w, h, att, flags; uint64_t count; } combos[64];
++   static uint32_t ncombo;
++   for (uint32_t i = 0; i < ncombo; i++) {
++      if (combos[i].w == w && combos[i].h == h && combos[i].att == att &&
++          combos[i].flags == flags) {
++         uint64_t c = ++combos[i].count;
++         if ((c & (c - 1)) == 0)
++            mesa_logw("TU_GMEM_SHAPE combo %ux%ux%u flags 0x%02x seen %" PRIu64 " times",
++                      w, h, att, flags, c);
++         return;
++      }
++   }
++   if (ncombo < ARRAY_SIZE(combos)) {
++      combos[ncombo] = { w, h, att, flags, 1 };
++      ncombo++;
++      char names[96] = "";
++      for (unsigned i = 0; i < ARRAY_SIZE(tu_diag_flag_names); i++) {
++         if (flags & tu_diag_flag_names[i].bit) {
++            strcat(names, " ");
++            strcat(names, tu_diag_flag_names[i].name);
++         }
++      }
++      mesa_logw("TU_GMEM_SHAPE new combo %ux%ux%u flags 0x%02x [%s ] draws %u -> %s",
++                w, h, att, flags, names, draws, gmem ? "gmem" : "sysmem");
++   }
++}
++
+ static bool
+ use_sysmem_rendering(struct tu_cmd_buffer *cmd,
+                      tu_autotune::rp_ctx_t *rp_ctx,
+@@ -1476,6 +1619,32 @@
+       return true;
+    }
+ 
++   const char *shape_spec = tu_gmem_shape_spec();
++   if (shape_spec) {
++      const struct tu_framebuffer *fb = cmd->state.framebuffer;
++      const struct tu_render_pass_state *rps = &cmd->state.rp;
++      uint32_t flags =
++         (rps->has_zpass_done_sample_count_write_in_rp ? TU_DIAG_OCCL : 0) |
++         (rps->diag_pred_draw ? TU_DIAG_PRED : 0) |
++         (rps->draw_cs_writes_to_cond_pred ? TU_DIAG_CONDW : 0) |
++         (rps->input_attachment_read_barrier ? TU_DIAG_IABAR : 0) |
++         (rps->sysmem_single_prim_mode ? TU_DIAG_SPM : 0) |
++         (cmd->vk.level == VK_COMMAND_BUFFER_LEVEL_SECONDARY ? TU_DIAG_SEC : 0) |
++         (cmd->state.suspend_resume != SR_NONE ? TU_DIAG_SR : 0) |
++         (cmd->state.lrz.valid ? TU_DIAG_LRZ : 0);
++      bool geometry = false;
++      bool match = tu_gmem_shape_match(shape_spec, fb->width, fb->height,
++                                       fb->attachment_count,
++                                       vsc->tile_count.width * vsc->tile_count.height,
++                                       flags, &geometry);
++      if (geometry)
++         tu_gmem_shape_log(fb->width, fb->height, fb->attachment_count, flags,
++                           rps->drawcall_count, match);
++      cmd->state.rp.force_render_mode_reason =
++         match ? "TU_GMEM_SHAPE match" : "TU_GMEM_SHAPE no match";
++      return !match;
++   }
++
+    if (TU_DEBUG(GMEM)) {
+       cmd->state.rp.force_render_mode_reason = "TU_DEBUG(GMEM)";
+       return false;
+@@ -5196,6 +5365,7 @@
+       return;
+    }
+ 
++   set->diag_image_count = 0;
+    tu_update_descriptor_sets<CHIP>(cmd->device, tu_descriptor_set_to_handle(set),
+                                    info->descriptorWriteCount,
+                                    info->pDescriptorWrites, 0, NULL);
+@@ -5262,6 +5432,7 @@
+       return;
+    }
+ 
++   set->diag_image_count = 0;
+    tu_update_descriptor_set_with_template<CHIP>(
+       cmd->device, set,
+       pPushDescriptorSetWithTemplateInfo->descriptorUpdateTemplate,
+@@ -8617,6 +8788,87 @@
+    }
+ }
+ 
++static void
++tu_diag_feedback_check(struct tu_cmd_buffer *cmd)
++{
++   static const bool logging = []() {
++      const char *s = os_get_option("TU_FEEDBACK_CHECK");
++      bool on = s && *s && *s != '0';
++      if (on)
++         mesa_logw("TU_FEEDBACK_CHECK enabled (memory-overlap detection)");
++      return on;
++   }();
++   static const bool mitigate = []() {
++      const char *s = os_get_option("TU_FEEDBACK_SYSMEM");
++      bool on = s && *s && *s != '0';
++      if (on)
++         mesa_logw("TU_FEEDBACK_SYSMEM enabled: passes with feedback loops use sysmem");
++      return on;
++   }();
++   static struct { const void *image; uint32_t att; } seen[128];
++   static uint32_t seen_count;
++   static uint64_t hits;
++
++   if ((!logging && !mitigate) || !cmd->state.pass || !cmd->state.attachments)
++      return;
++   const struct tu_descriptor_state *ds =
++      &cmd->descriptors[VK_PIPELINE_BIND_POINT_GRAPHICS];
++   const struct tu_framebuffer *fb = cmd->state.framebuffer;
++   for (uint32_t s = 0; s < MAX_SETS; s++) {
++      const struct tu_descriptor_set *set = ds->sets[s];
++      if (!set)
++         continue;
++      for (uint32_t i = 0; i < set->diag_image_count; i++) {
++         const struct tu_image *img = set->diag_images[i].image;
++         if (!img)
++            continue;
++         for (uint32_t a = 0; a < cmd->state.pass->attachment_count; a++) {
++            const struct tu_image_view *att = cmd->state.attachments[a];
++            if (!att || !att->image)
++               continue;
++            const struct tu_image *ai = att->image;
++            bool same = ai == img;
++            bool overlap = img->iova && ai->iova &&
++                           img->iova < ai->iova + ai->total_size &&
++                           ai->iova < img->iova + img->total_size;
++            if (!same && !overlap)
++               continue;
++            bool input = set->diag_images[i].input_attachment;
++            if (mitigate && !input && !cmd->state.rp.disable_gmem) {
++               cmd->state.rp.disable_gmem = true;
++               cmd->state.rp.force_render_mode_reason = "undeclared feedback loop";
++            }
++            if (!logging)
++               continue;
++            hits++;
++            bool known = false;
++            for (uint32_t k = 0; k < seen_count; k++)
++               known |= seen[k].image == img && seen[k].att == a;
++            if (!known && seen_count < ARRAY_SIZE(seen)) {
++               seen[seen_count].image = img;
++               seen[seen_count].att = a;
++               seen_count++;
++               mesa_logw("TU_FEEDBACK hit #%u: %s fb %ux%u att_count %u attachment %u "
++                         "att_format %d sampled_format %d image %ux%u set %u offset %u "
++                         "fs %.16s gmem_shape_pass %d",
++                         seen_count, input ? "input-attachment" : same ? "same-image" : "ALIAS",
++                         fb ? fb->width : 0, fb ? fb->height : 0,
++                         cmd->state.pass->attachment_count, a, (int)ai->vk.format,
++                         (int)img->vk.format,
++                         img->vk.extent.width, img->vk.extent.height, s,
++                         set->diag_images[i].offset,
++                         cmd->state.program.stage_blake3[MESA_SHADER_FRAGMENT],
++                         (int)(fb && fb->width == 1280 && fb->height == 720 &&
++                               cmd->state.pass->attachment_count == 7));
++            }
++            if ((hits & (hits - 1)) == 0)
++               mesa_logw("TU_FEEDBACK total hits %" PRIu64 " (distinct %u)", hits,
++                         seen_count);
++         }
++      }
++   }
++}
++
+ template <chip CHIP>
+ static VkResult
+ tu6_draw_common(struct tu_cmd_buffer *cmd,
+@@ -8628,6 +8880,10 @@
+    const struct tu_program_state *program = &cmd->state.program;
+    struct tu_render_pass_state *rp = &cmd->state.rp;
+ 
++   tu_diag_feedback_check(cmd);
++   if (cmd->state.predication_active)
++      cmd->state.rp.diag_pred_draw = true;
++
+    trace_start_draw(
+       &cmd->rp_trace, &cmd->draw_cs, cmd, draw_count,
+       cmd->state.program.stage_blake3[MESA_SHADER_VERTEX],
+--- a/src/freedreno/vulkan/tu_cmd_buffer.h
++++ b/src/freedreno/vulkan/tu_cmd_buffer.h
+@@ -359,6 +359,7 @@
+    bool read_only_input_attachments;
+ 
+    uint32_t drawcall_count;
++   bool diag_pred_draw;
+ 
+    /* A calculated "draw cost" value for renderpass, which tries to
+     * estimate the bandwidth-per-sample of all the draws according
+--- a/src/freedreno/vulkan/tu_descriptor_set.cc
++++ b/src/freedreno/vulkan/tu_descriptor_set.cc
+@@ -1214,6 +1214,30 @@
+ }
+ 
+ static void
++tu_diag_note_image(struct tu_descriptor_set *set, const uint32_t *dst,
++                   const VkDescriptorImageInfo *image_info, VkDescriptorType type)
++{
++   if (!set || !set->mapped_ptr || !image_info || image_info->imageView == VK_NULL_HANDLE)
++      return;
++   VK_FROM_HANDLE(tu_image_view, iview, image_info->imageView);
++   uint32_t offset = (uint32_t)(dst - set->mapped_ptr);
++   for (uint32_t i = 0; i < set->diag_image_count; i++) {
++      if (set->diag_images[i].offset == offset) {
++         set->diag_images[i].image = iview->image;
++         set->diag_images[i].input_attachment = type == VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
++         return;
++      }
++   }
++   if (set->diag_image_count < ARRAY_SIZE(set->diag_images)) {
++      set->diag_images[set->diag_image_count].offset = offset;
++      set->diag_images[set->diag_image_count].image = iview->image;
++      set->diag_images[set->diag_image_count].input_attachment =
++         type == VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
++      set->diag_image_count++;
++   }
++}
++
++static void
+ write_image_descriptor(uint32_t *dst,
+                        VkDescriptorType descriptor_type,
+                        const VkDescriptorImageInfo *image_info)
+@@ -1486,11 +1510,13 @@
+          case VK_DESCRIPTOR_TYPE_BLOCK_MATCH_IMAGE_QCOM:
+          case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
+             write_image_descriptor(ptr, writeset->descriptorType, writeset->pImageInfo + j);
++            tu_diag_note_image(set, ptr, writeset->pImageInfo + j, writeset->descriptorType);
+             break;
+          case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+             write_combined_image_sampler_descriptor(
+                ptr, writeset->descriptorType, writeset->pImageInfo + j, !samplers,
+                sampler_has_subsampled_bit(samplers, writeset->dstArrayElement + j));
++            tu_diag_note_image(set, ptr, writeset->pImageInfo + j, writeset->descriptorType);
+ 
+             if (copy_immutable_samplers)
+                write_sampler_push(ptr + FDL6_TEX_CONST_DWORDS, &samplers[writeset->dstArrayElement + j]);
+@@ -1863,12 +1889,14 @@
+          case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT: {
+             write_image_descriptor(ptr, templ->entry[i].descriptor_type,
+                                    static_cast<const VkDescriptorImageInfo *>(src));
++            tu_diag_note_image(set, ptr, static_cast<const VkDescriptorImageInfo *>(src), templ->entry[i].descriptor_type);
+             break;
+          }
+          case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+             write_combined_image_sampler_descriptor(ptr, templ->entry[i].descriptor_type,
+                                                     static_cast<const VkDescriptorImageInfo *>(src), !samplers,
+                                                     sampler_has_subsampled_bit(samplers, j));
++            tu_diag_note_image(set, ptr, static_cast<const VkDescriptorImageInfo *>(src), templ->entry[i].descriptor_type);
+             if (templ->entry[i].copy_immutable_samplers)
+                write_sampler_push(ptr + FDL6_TEX_CONST_DWORDS, &samplers[j]);
+             break;
+--- a/src/freedreno/vulkan/tu_descriptor_set.h
++++ b/src/freedreno/vulkan/tu_descriptor_set.h
+@@ -143,6 +143,13 @@
+    uint32_t host_size;
+ 
+    uint32_t *dynamic_descriptors;
++
++   uint32_t diag_image_count;
++   struct {
++      uint32_t offset;
++      const struct tu_image *image;
++      bool input_attachment;
++   } diag_images[64];
+ };
+ VK_DEFINE_NONDISP_HANDLE_CASTS(tu_descriptor_set, base, VkDescriptorSet,
+                                VK_OBJECT_TYPE_DESCRIPTOR_SET)
