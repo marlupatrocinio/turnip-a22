@@ -70,7 +70,7 @@ fi
 if ! command -v glslangValidator >/dev/null; then
     if [ ! -x "$HERE/tools/glslang/bin/glslangValidator$EXE" ]; then
         log "downloading glslang $GLSLANG_VERSION"
-        curl -L --fail -o "$WORK/glslang.zip" \
+        curl -L --fail -o "$(winpath "$WORK/glslang.zip")" \
             "https://github.com/KhronosGroup/glslang/releases/download/$GLSLANG_VERSION/glslang-$GLSLANG_VERSION-$GLSLANG_ASSET-release.zip"
         unzip -q -o "$WORK/glslang.zip" -d "$HERE/tools/glslang"
         # recent releases ship only `glslang`; Mesa looks for glslangValidator
@@ -97,7 +97,7 @@ fi
 
 if [ ! -d "$NDK" ]; then
     log "downloading Android NDK $NDK_VERSION"
-    curl -L --fail -o "$WORK/ndk.zip" \
+    curl -L --fail -o "$(winpath "$WORK/ndk.zip")" \
         "https://dl.google.com/android/repository/android-ndk-$NDK_VERSION-$HOST.zip"
     unzip -q "$WORK/ndk.zip" -d "$HERE/src"
 fi
@@ -110,7 +110,7 @@ SYSROOT="$NDK_W/toolchains/llvm/prebuilt/$HOST_TAG/sysroot"
 MESA_SRC="${MESA_SRC:-$HERE/src/mesa-$MESA_VERSION}"
 if [ ! -d "$MESA_SRC" ]; then
     log "fetching Mesa $MESA_VERSION"
-    curl -L --fail -o "$WORK/mesa.tar.xz" "$MESA_URL"
+    curl -L --fail -o "$(winpath "$WORK/mesa.tar.xz")" "$MESA_URL"
     if [ -n "${MESA_SHA256:-}" ]; then
         echo "$MESA_SHA256  $WORK/mesa.tar.xz" | sha256sum -c -
     fi

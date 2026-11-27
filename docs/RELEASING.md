@@ -35,8 +35,8 @@ ls -lh dist
 Expected artifacts (all deterministic, see §6):
 
 ```
-turnip-a22-26.3.0.adpkg.zip
-turnip-a22-26.3.0.debug.zip
+turnip-a22-26.3.1.adpkg.zip
+turnip-a22-26.3.1.debug.zip
 SHA256SUMS.txt
 ```
 
@@ -46,7 +46,7 @@ Local (device attached, faster):
 
 ```bash
 bash scripts/build_probes.sh
-bash scripts/device_test.sh dist/turnip-a22-26.3.0.adpkg.zip
+bash scripts/device_test.sh dist/turnip-a22-26.3.1.adpkg.zip
 ```
 
 Expected tail:
@@ -60,7 +60,7 @@ PASS: driver gate satisfied
 Or via CI once the package is on a release/tag:
 
 ```
-Actions → device-test → Run workflow → tag: v26.3.0-a22.3
+Actions → device-test → Run workflow → tag: v26.3.1-a22.4
 ```
 
 **Do not continue if the gate fails.** Record the output in the issue tracker and
@@ -70,10 +70,10 @@ fix the cause; a tag is cheap, a bad release is not.
 
 ```bash
 git add -A
-git commit -m "Turnip A22 26.3.0: deterministic packaging, debug symbols, device gate"
+git commit -m "Turnip A22 26.3.1: deterministic packaging, debug symbols, device gate"
 git push
-git tag -a v26.3.0-a22.3 -m "Turnip A22 26.3.0 (packaging v2)"
-git push origin v26.3.0-a22.3
+git tag -a v26.3.1-a22.4 -m "Turnip A22 26.3.1 (packaging v2)"
+git push origin v26.3.1-a22.4
 ```
 
 Tags are immutable. If something is wrong after pushing, cut the next tag; never
@@ -84,18 +84,18 @@ move or delete a published one.
 Workflow (rebuilds from the tag, then publishes):
 
 ```bash
-gh workflow run release.yml -f tag=v26.3.0-a22.3
+gh workflow run release.yml -f tag=v26.3.1-a22.4
 gh run watch
 ```
 
 or attach the locally gated artifacts (what was actually tested):
 
 ```bash
-gh release create v26.3.0-a22.3 \
-  dist/turnip-a22-26.3.0.adpkg.zip \
-  dist/turnip-a22-26.3.0.debug.zip \
+gh release create v26.3.1-a22.4 \
+  dist/turnip-a22-26.3.1.adpkg.zip \
+  dist/turnip-a22-26.3.1.debug.zip \
   dist/SHA256SUMS.txt \
-  --title "Turnip A22 26.3.0" \
+  --title "Turnip A22 26.3.1" \
   --generate-notes
 ```
 
@@ -105,9 +105,9 @@ the workflow; for a manual release add it explicitly.
 ## 5. Verify
 
 ```bash
-gh release view v26.3.0-a22.3
+gh release view v26.3.1-a22.4
 # download one asset and compare
-curl -L -o /tmp/a.zip "$(gh release view v26.3.0-a22.3 --json assets -q '.assets[] | select(.name|endswith("turnip-a22-26.3.0.adpkg.zip")) | .url')"
+curl -L -o /tmp/a.zip "$(gh release view v26.3.1-a22.4 --json assets -q '.assets[] | select(.name|endswith("turnip-a22-26.3.1.adpkg.zip")) | .url')"
 sha256sum /tmp/a.zip   # must match SHA256SUMS.txt
 minisign -Vm SHA256SUMS.txt -p minisign.pub   # if signed
 ```
@@ -124,7 +124,7 @@ minisign -Vm SHA256SUMS.txt -p minisign.pub   # if signed
   only contain `meta.json` + the driver. Symbolize a tombstone address with:
 
   ```bash
-  unzip turnip-a22-26.3.0.debug.zip
+  unzip turnip-a22-26.3.1.debug.zip
   llvm-symbolizer --obj=libvulkan_freedreno.so.debug 0xb90f3c
   ```
 

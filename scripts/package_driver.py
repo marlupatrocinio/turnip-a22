@@ -24,11 +24,11 @@ import zipfile
 
 PACKAGE_NAME = "Turnip A22 (Snapdragon G2 Gen 2)"
 PACKAGE_DESCRIPTION = (
-    "Mesa 26.3.0 freedreno Vulkan HAL for the Qualcomm Snapdragon G2 Gen 2 "
+    "Mesa {version} freedreno Vulkan HAL for the Qualcomm Snapdragon G2 Gen 2 "
     "(SG6275P), Adreno (TM) 22 / gen7-11-0 (chip_id 0x43030b00). Release "
     "build: -O3, ARMv8.6-A ISA, static libc++, stripped."
 )
-PACKAGE_VERSION = "3"
+PACKAGE_VERSION = "4"
 
 # 1980-01-01 is the earliest timestamp a zip can represent; a constant makes the
 # archive byte-for-byte reproducible.
@@ -59,7 +59,7 @@ def write_deterministic_zip(zip_path, entries):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--so", required=True)
-    ap.add_argument("--version", default="26.3.0")
+    ap.add_argument("--version", default="26.3.1")
     ap.add_argument("--author", default="A22 Turnip Build")
     ap.add_argument("--strip-tool", default=None)
     ap.add_argument("--objcopy-tool", default=None)
@@ -95,7 +95,7 @@ def main():
     meta = {
         "schemaVersion": 1,
         "name": args.name,
-        "description": args.description,
+        "description": args.description.format(version=args.version),
         "author": args.author,
         "packageVersion": PACKAGE_VERSION,
         "vendor": "Mesa",

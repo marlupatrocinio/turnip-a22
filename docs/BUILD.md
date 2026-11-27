@@ -4,8 +4,8 @@
 
 ```bash
 ./scripts/build_turnip_g2gen2.sh
-# -> dist/turnip-a22-26.3.0.adpkg.zip
-#    dist/turnip-a22-26.3.0.debug.zip
+# -> dist/turnip-a22-26.3.1.adpkg.zip
+#    dist/turnip-a22-26.3.1.debug.zip
 #    dist/SHA256SUMS.txt
 ```
 
@@ -16,7 +16,7 @@ The script reads pinned versions from `versions.env` and:
 
 1. installs `meson`, `ninja`, `mako`, `pyyaml`, `packaging` if missing;
 2. downloads glslang 16.6.0 and Android NDK r28c if absent;
-3. downloads Mesa 26.3.0 and applies `patches/*.patch`;
+3. downloads Mesa 26.3.1 and applies `patches/*.patch`;
 4. cross-compiles Turnip with the ARMv8.6-A flags below;
 5. strips the library, emits debug symbols and writes deterministic archives.
 

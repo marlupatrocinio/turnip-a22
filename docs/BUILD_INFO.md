@@ -1,4 +1,4 @@
-# Build provenance — Turnip A22 26.3.0
+# Build provenance — Turnip A22 26.3.1 (a22.4)
 
 ## Target device
 
@@ -13,10 +13,10 @@
 
 | Component | Version |
 |---|---|
-| Mesa | 26.3.0 (`archive.mesa3d.org`, `.sig` published upstream) |
+| Mesa | 26.3.1 (`archive.mesa3d.org`, sha256 `4e4e438e…` pinned in `versions.env` and verified by the build) |
 | Android NDK | r28c — clang 19.0.1, target `aarch64-linux-android35` |
 | glslang | 16.6.0 (Turnip needs >= 12.2 for BVH shaders) |
-| Patches | `0001-freedreno-add-A22-device-id.patch`, `0002-meson-allow-posix-flex-when-cross-compiling-for-android.patch` |
+| Patches | `0001` A22 device id, `0002` POSIX flex for Android, `0003` XML-include lint path fix, `0004` A7XX RB static regs on BR only |
 
 ## Meson configuration
 

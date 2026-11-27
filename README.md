@@ -4,7 +4,7 @@
 
 **Mesa Turnip (Vulkan) for the Snapdragon G2 Gen 2 handheld — Adreno (TM) 22, `chip_id 0x43030b00`, `gen7-11-0`.**
 
-[![Mesa](https://img.shields.io/badge/Mesa-26.3.0-2b6cb0)](https://mesa3d.org)
+[![Mesa](https://img.shields.io/badge/Mesa-26.3.1-2b6cb0)](https://mesa3d.org)
 [![Android](https://img.shields.io/badge/Android-15%20%2F%20API%2035-3ddc84)](https://developer.android.com)
 [![Vulkan](https://img.shields.io/badge/Vulkan-1.4.363-e53e3e)](#verification)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
@@ -13,7 +13,7 @@
 
 ---
 
-Mesa 26.3.0 freedreno build packaged as an Android Vulkan HAL for
+Mesa 26.3.1 freedreno build packaged as an Android Vulkan HAL for
 [AdrenoTools](https://github.com/bylaws/libadrenotools) front-ends. No root.
 
 ## Target hardware
@@ -31,8 +31,8 @@ Device identity is exact-match (`Adreno (TM) 22`), not the Adreno 735 wildcard.
 
 | File | Contents |
 |---|---|
-| `turnip-a22-26.3.0.adpkg.zip` | `meta.json` + stripped `libvulkan_freedreno.so` |
-| `turnip-a22-26.3.0.debug.zip` | `libvulkan_freedreno.so.debug` (build-id matched) |
+| `turnip-a22-26.3.1.adpkg.zip` | `meta.json` + stripped `libvulkan_freedreno.so` |
+| `turnip-a22-26.3.1.debug.zip` | `libvulkan_freedreno.so.debug` (build-id matched) |
 | `SHA256SUMS.txt` | deterministic hashes for both |
 
 Build flags: `-O3`, `-DNDEBUG`, `-march=armv8.6-a+crypto+crc+dotprod+fp16+i8mm+bf16`,
@@ -44,7 +44,7 @@ only (`libc`, `libm`, `libdl`, `libz`, `liblog`, `libhardware`,
 ## Install
 
 ```bash
-adb push turnip-a22-26.3.0.adpkg.zip /sdcard/Download/
+adb push turnip-a22-26.3.1.adpkg.zip /sdcard/Download/
 ```
 
 Import the zip in the front-end's driver manager (Winlator: *Adrenotools GPU
@@ -80,8 +80,8 @@ Method and raw data: [`docs/VALIDATION.md`](docs/VALIDATION.md),
 
 ```bash
 ./scripts/build_turnip_g2gen2.sh
-# -> dist/turnip-a22-26.3.0.adpkg.zip
-#    dist/turnip-a22-26.3.0.debug.zip
+# -> dist/turnip-a22-26.3.1.adpkg.zip
+#    dist/turnip-a22-26.3.1.debug.zip
 #    dist/SHA256SUMS.txt
 ```
 
@@ -93,7 +93,7 @@ Release gate before publishing:
 
 ```bash
 bash scripts/build_probes.sh
-bash scripts/device_test.sh dist/turnip-a22-26.3.0.adpkg.zip
+bash scripts/device_test.sh dist/turnip-a22-26.3.1.adpkg.zip
 ```
 
 ## Runtime knobs
