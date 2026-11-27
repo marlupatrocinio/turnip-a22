@@ -1,4 +1,4 @@
-# Turnip A22 26.3.1 (a22.4) - release notes (DRAFT)
+# Turnip A22 26.3.1 (a22.4) - release notes
 
 Stability release for the Retroid Pocket G2 (Snapdragon G2 Gen 2, Adreno A22).
 No new tuning; FPS is unchanged in the titles tested.
@@ -33,16 +33,26 @@ rendering is unchanged.
 
 ## Validation of this exact package (26.3.1 + 0001-0004)
 
-| Check | Status |
-|---|---|
-| Build: checksum, all four patches apply, warnings | done - clean |
-| Static: identity `Mesa 26.3.1` / `Adreno (TM) 22`, only `HMI` exported, same 8 system deps | done |
-| Device gate (`scripts/device_test.sh`) | **pending (device)** |
-| AHB error count = 0 | **pending (device)** |
-| `dEQP-VK.renderpasses.*` vs baseline | **pending (device)** |
-| Short play check: BOTW (Eden), NMS / Sleeping Dogs (GameNative) | **pending (device)** |
+Package `turnip-a22-26.3.1.adpkg.zip`, sha256
+`79c7aa7418fa8e7cfa9435522cfa6b246e3872f31e91f0de1db1110b504c668b`, on the
+Retroid Pocket G2 (Android 15, kernel 6.1.115), 2026-11-27:
 
-Do not tag or publish until every row is done.
+| Check | Result |
+|---|---|
+| Build: checksum, all four patches apply | clean |
+| Static: `Mesa 26.3.1` / `Adreno (TM) 22`, only `HMI` exported, same 8 system deps | OK |
+| Device gate (`scripts/device_test.sh`) | PASS - compute 64/64, clear+resolve 262144/262144 |
+| AHB error interrupts, a22bench 4000-draw run | **0** (a22.3: 2,778) |
+| a22bench 64×64 × 4000 draws | 1.188 ms/frame (a22.3: 1.185) |
+| `dEQP-VK.renderpasses.*` (81,687 cases) | 53,450 Pass, 22 Fail, 28,215 NotSupported - **0 new failures** vs baseline |
+| Play check: BOTW (Eden), GameNative title | renders and runs normally |
+
+## Install
+
+Import `turnip-a22-26.3.1.adpkg.zip` in the front-end's driver manager
+(Eden: Settings → GPU → Install driver; GameNative/Winlator: driver
+manager) and select it; it reports `Turnip Adreno (TM) 22`, driver version
+26.3.1. Restart the emulator fully after switching drivers.
 
 ## Known issues (unchanged)
 

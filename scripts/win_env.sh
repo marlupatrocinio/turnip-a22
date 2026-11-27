@@ -17,6 +17,7 @@ for _d in "$_pkgs"/Kitware.CMake_*/cmake-*/bin \
           "$_pkgs"/Ninja-build.Ninja_* \
           "$_pkgs"/WinFlexBison.win_flex_bison_* \
           "$_pkgs"/Google.PlatformTools_*/platform-tools \
+          "$_pkgs"/GitHub.cli_*/bin \
           "$(cygpath "$LOCALAPPDATA")/Programs/Python/Python312" \
           "$_here/tools/glslang/bin"; do
     _add "$_d"
